@@ -1,0 +1,242 @@
+{
+  "name": "Linux Commands Reference",
+  "description": "Comandos esenciales de Linux organizados por categoría",
+  "version": "1.0",
+  "categories": {
+    "system": {
+      "title": "Sistema",
+      "icon": "🖥️",
+      "commands": [
+        {"cmd": "uname -a", "desc": "Información completa del sistema"},
+        {"cmd": "whoami", "desc": "Usuario actual"},
+        {"cmd": "id", "desc": "UID, GID y grupos del usuario"},
+        {"cmd": "hostname", "desc": "Nombre del host"},
+        {"cmd": "uptime", "desc": "Tiempo encendido y load average"},
+        {"cmd": "df -h", "desc": "Espacio en disco (human readable)"},
+        {"cmd": "du -sh *", "desc": "Espacio usado por cada directorio"},
+        {"cmd": "free -h", "desc": "Memoria RAM y swap"},
+        {"cmd": "cat /proc/cpuinfo", "desc": "Info del CPU"},
+        {"cmd": "cat /proc/meminfo", "desc": "Info detallada de memoria"},
+        {"cmd": "lscpu", "desc": "Resumen de CPU"},
+        {"cmd": "lsblk", "desc": "Dispositivos de bloque"},
+        {"cmd": "mount", "desc": "Sistemas de archivos montados"},
+        {"cmd": "cat /etc/os-release", "desc": "Versión del SO"}
+      ]
+    },
+    "files": {
+      "title": "Archivos y Navegación",
+      "icon": "📁",
+      "commands": [
+        {"cmd": "ls -la", "desc": "Listar archivos incluyendo ocultos"},
+        {"cmd": "cd /ruta", "desc": "Cambiar directorio"},
+        {"cmd": "pwd", "desc": "Directorio actual"},
+        {"cmd": "find / -name archivo", "desc": "Buscar archivo por nombre"},
+        {"cmd": "find / -type f -name '*.txt'", "desc": "Buscar por extensión"},
+        {"cmd": "grep -r 'texto' /directorio", "desc": "Buscar texto en archivos"},
+        {"cmd": "cat archivo", "desc": "Mostrar contenido"},
+        {"cmd": "head -n 20 archivo", "desc": "Primeras 20 líneas"},
+        {"cmd": "tail -n 20 archivo", "desc": "Últimas 20 líneas"},
+        {"cmd": "tail -f archivo.log", "desc": "Ver log en tiempo real"},
+        {"cmd": "wc -l archivo", "desc": "Contar líneas"},
+        {"cmd": "chmod 755 archivo", "desc": "Cambiar permisos"},
+        {"cmd": "chown user:group archivo", "desc": "Cambiar propietario"},
+        {"cmd": "ln -s origen enlace", "desc": "Crear enlace simbólico"},
+        {"cmd": "tar -czvf archivo.tar.gz dir/", "desc": "Comprimir directorio"},
+        {"cmd": "tar -xzvf archivo.tar.gz", "desc": "Descomprimir"},
+        {"cmd": "cp -r origen/ destino/", "desc": "Copiar directorio recursivamente"},
+        {"cmd": "mv origen destino", "desc": "Mover o renombrar"},
+        {"cmd": "rm -rf directorio/", "desc": "Eliminar directorio y contenido"}
+      ]
+    },
+    "search": {
+      "title": "Búsqueda y Texto",
+      "icon": "🔎",
+      "commands": [
+        {"cmd": "grep 'patron' archivo", "desc": "Buscar patrón en archivo"},
+        {"cmd": "grep -r 'patron' dir/", "desc": "Buscar recursivamente"},
+        {"cmd": "grep -i 'patron' archivo", "desc": "Buscar sin importar mayúsculas"},
+        {"cmd": "grep -n 'patron' archivo", "desc": "Mostrar número de línea"},
+        {"cmd": "grep -E 'patron1|patron2' archivo", "desc": "Regex OR"},
+        {"cmd": "sed 's/antiguo/nuevo/g' archivo", "desc": "Reemplazar texto"},
+        {"cmd": "awk '{print $1}' archivo", "desc": "Imprimir primera columna"},
+        {"cmd": "cut -d: -f1 archivo", "desc": "Extraer campo por delimitador"},
+        {"cmd": "sort archivo | uniq", "desc": "Ordenar y eliminar duplicados"},
+        {"cmd": "wc -w archivo", "desc": "Contar palabras"},
+        {"cmd": "diff archivo1 archivo2", "desc": "Comparar archivos"},
+        {"cmd": "xargs", "desc": "Construir comandos desde stdin"}
+      ]
+    },
+    "processes": {
+      "title": "Procesos y Servicios",
+      "icon": "⚙️",
+      "commands": [
+        {"cmd": "ps aux", "desc": "Todos los procesos con detalles"},
+        {"cmd": "ps aux | grep proceso", "desc": "Buscar proceso específico"},
+        {"cmd": "top", "desc": "Monitor de procesos interactivo"},
+        {"cmd": "htop", "desc": "Versión mejorada de top"},
+        {"cmd": "kill -9 PID", "desc": "Matar proceso por PID"},
+        {"cmd": "killall nombre", "desc": "Matar por nombre"},
+        {"cmd": "pkill -f patron", "desc": "Matar por patrón"},
+        {"cmd": "bg", "desc": "Reanudar trabajo en background"},
+        {"cmd": "fg", "desc": "Traer trabajo a foreground"},
+        {"cmd": "jobs", "desc": "Listar trabajos actuales"},
+        {"cmd": "nohup comando &", "desc": "Ejecutar inmune a hangup"},
+        {"cmd": "systemctl status servicio", "desc": "Estado de servicio systemd"},
+        {"cmd": "systemctl start/stop servicio", "desc": "Iniciar/detener servicio"},
+        {"cmd": "systemctl enable servicio", "desc": "Habilitar al arranque"},
+        {"cmd": "service servicio status", "desc": "Estado de servicio (SysV)"}
+      ]
+    },
+    "networking": {
+      "title": "Networking",
+      "icon": "🌐",
+      "commands": [
+        {"cmd": "ip a", "desc": "Direcciones IP de interfaces"},
+        {"cmd": "ip route", "desc": "Tabla de enrutamiento"},
+        {"cmd": "ifconfig", "desc": "Info de interfaces (legacy)"},
+        {"cmd": "ping -c 4 host", "desc": "Ping con 4 paquetes"},
+        {"cmd": "traceroute host", "desc": "Ver ruta a host"},
+        {"cmd": "mtr host", "desc": "Traceroute continuo"},
+        {"cmd": "nslookup dominio", "desc": "Consulta DNS"},
+        {"cmd": "dig dominio", "desc": "Info DNS detallada"},
+        {"cmd": "netstat -tulpn", "desc": "Puertos en escucha"},
+        {"cmd": "ss -tulpn", "desc": "Alternativa moderna a netstat"},
+        {"cmd": "curl -I url", "desc": "Headers HTTP"},
+        {"cmd": "curl url", "desc": "Contenido de URL"},
+        {"cmd": "wget url", "desc": "Descargar archivo"},
+        {"cmd": "ssh user@host", "desc": "Conexión SSH"},
+        {"cmd": "scp archivo user@host:/ruta", "desc": "Copiar por SSH"},
+        {"cmd": "nc -lvnp 4444", "desc": "Netcat listener"},
+        {"cmd": "nc host 4444", "desc": "Netcat cliente"},
+        {"cmd": "telnet host puerto", "desc": "Conexión telnet"},
+        {"cmd": "iptables -L", "desc": "Ver reglas de firewall"},
+        {"cmd": "ufw status", "desc": "Estado de UFW firewall"}
+      ]
+    },
+    "ufw": {
+      "title": "UFW Firewall",
+      "icon": "🔥",
+      "commands": [
+        {"cmd": "ufw status", "desc": "Estado del firewall"},
+        {"cmd": "ufw enable", "desc": "Activar UFW"},
+        {"cmd": "ufw disable", "desc": "Desactivar UFW"},
+        {"cmd": "ufw allow 22", "desc": "Permitir puerto 22"},
+        {"cmd": "ufw allow ssh", "desc": "Permitir SSH por nombre"},
+        {"cmd": "ufw deny 80", "desc": "Bloquear puerto 80"},
+        {"cmd": "ufw delete allow 22", "desc": "Eliminar regla"},
+        {"cmd": "ufw status numbered", "desc": "Ver reglas con números"},
+        {"cmd": "ufw delete 3", "desc": "Eliminar regla número 3"},
+        {"cmd": "ufw allow from 192.168.1.0/24", "desc": "Permitir subnet"},
+        {"cmd": "ufw allow 80/tcp", "desc": "Permitir TCP específico"},
+        {"cmd": "ufw reset", "desc": "Resetear a defaults"}
+      ]
+    },
+    "users": {
+      "title": "Usuarios y Permisos",
+      "icon": "👤",
+      "commands": [
+        {"cmd": "who", "desc": "Usuarios conectados"},
+        {"cmd": "w", "desc": "Quién y qué hacen"},
+        {"cmd": "last", "desc": "Historial de logins"},
+        {"cmd": "lastlog", "desc": "Último login de cada usuario"},
+        {"cmd": "useradd -m usuario", "desc": "Crear usuario"},
+        {"cmd": "userdel usuario", "desc": "Eliminar usuario"},
+        {"cmd": "usermod -aG grupo usuario", "desc": "Añadir a grupo"},
+        {"cmd": "passwd usuario", "desc": "Cambiar contraseña"},
+        {"cmd": "cat /etc/passwd", "desc": "Lista de usuarios"},
+        {"cmd": "cat /etc/shadow", "desc": "Hashes de contraseñas"},
+        {"cmd": "cat /etc/group", "desc": "Lista de grupos"},
+        {"cmd": "su - usuario", "desc": "Cambiar a otro usuario"},
+        {"cmd": "sudo comando", "desc": "Ejecutar como root"},
+        {"cmd": "visudo", "desc": "Editar sudoers safely"}
+      ]
+    },
+    "packages": {
+      "title": "APT / Snap",
+      "icon": "📦",
+      "commands": [
+        {"cmd": "apt update", "desc": "Actualizar lista de paquetes"},
+        {"cmd": "apt upgrade", "desc": "Actualizar paquetes"},
+        {"cmd": "apt install paquete", "desc": "Instalar paquete"},
+        {"cmd": "apt remove paquete", "desc": "Desinstalar paquete"},
+        {"cmd": "apt search palabra", "desc": "Buscar paquete"},
+        {"cmd": "apt list --installed", "desc": "Paquetes instalados"},
+        {"cmd": "apt show paquete", "desc": "Info del paquete"},
+        {"cmd": "dpkg -l", "desc": "Lista de paquetes .deb"},
+        {"cmd": "snap install paquete", "desc": "Instalar snap"},
+        {"cmd": "snap list", "desc": "Snaps instalados"},
+        {"cmd": "snap remove paquete", "desc": "Eliminar snap"}
+      ]
+    },
+    "cron": {
+      "title": "Cron Jobs",
+      "icon": "⏰",
+      "commands": [
+        {"cmd": "crontab -l", "desc": "Ver crontab del usuario"},
+        {"cmd": "crontab -e", "desc": "Editar crontab"},
+        {"cmd": "crontab -r", "desc": "Eliminar crontab"},
+        {"cmd": "cat /etc/crontab", "desc": "Crontab del sistema"},
+        {"cmd": "ls -la /etc/cron.d/", "desc": "Jobs del directorio cron.d"},
+        {"cmd": "ls -la /etc/cron.hourly/", "desc": "Jobs hourly"},
+        {"cmd": "ls -la /etc/cron.daily/", "desc": "Jobs daily"},
+        {"cmd": "ls -la /etc/cron.weekly/", "desc": "Jobs weekly"},
+        {"cmd": "ls -la /etc/cron.monthly/", "desc": "Jobs monthly"},
+        {"cmd": "cat /var/spool/cron/crontabs/user", "desc": "Crontab de usuario específico"}
+      ]
+    },
+    "containers": {
+      "title": "Containers LXD",
+      "icon": "🛠️",
+      "commands": [
+        {"cmd": "lxc list", "desc": "Listar contenedores"},
+        {"cmd": "lxc image list", "desc": "Imágenes disponibles"},
+        {"cmd": "lxc launch ubuntu:22.04 nombre", "desc": "Crear contenedor Ubuntu"},
+        {"cmd": "lxc start nombre", "desc": "Iniciar contenedor"},
+        {"cmd": "lxc stop nombre", "desc": "Detener contenedor"},
+        {"cmd": "lxc delete nombre", "desc": "Eliminar contenedor"},
+        {"cmd": "lxc exec nombre -- comando", "desc": "Ejecutar en contenedor"},
+        {"cmd": "lxc info nombre", "desc": "Info del contenedor"},
+        {"cmd": "lxc config show nombre", "desc": "Ver configuración"},
+        {"cmd": "lxc snapshot nombre snapshot1", "desc": "Crear snapshot"},
+        {"cmd": "lxc restore nombre snapshot1", "desc": "Restaurar snapshot"}
+      ]
+    },
+    "tips": {
+      "title": "Tips Linux",
+      "icon": "🧠",
+      "commands": [
+        {"cmd": "history | grep comando", "desc": "Buscar en historial"},
+        {"cmd": "Ctrl+R", "desc": "Búsqueda inversa en historial"},
+        {"cmd": "alias l='ls -la'", "desc": "Crear alias temporal"},
+        {"cmd": "export VAR=valor", "desc": "Definir variable de entorno"},
+        {"cmd": "echo $VAR", "desc": "Ver valor de variable"},
+        {"cmd": "source ~/.bashrc", "desc": "Recargar configuración bash"},
+        {"cmd": "tree -L 2 directorio", "desc": "Ver estructura de árbol"},
+        {"cmd": "watch -n 1 comando", "desc": "Ejecutar comando cada segundo"},
+        {"cmd": "xargs -I {} comando {}", "desc": "Usar entrada como argumento"},
+        {"cmd": "tee archivo", "desc": "Mostrar y guardar salida"},
+        {"cmd": "script archivo.log", "desc": "Grabar sesión de terminal"}
+      ]
+    }
+  },
+  "shortcuts": {
+    "title": "Shortcuts Terminal",
+    "icon": "⌨️",
+    "items": [
+      {"shortcut": "Ctrl+C", "action": "Cancelar proceso actual"},
+      {"shortcut": "Ctrl+Z", "action": "Suspender proceso (bg después)"},
+      {"shortcut": "Ctrl+D", "action": "EOF / Cerrar shell"},
+      {"shortcut": "Ctrl+L", "action": "Limpiar pantalla (clear)"},
+      {"shortcut": "Ctrl+A", "action": "Ir al inicio de línea"},
+      {"shortcut": "Ctrl+E", "action": "Ir al fin de línea"},
+      {"shortcut": "Ctrl+U", "action": "Borrar desde cursor hasta inicio"},
+      {"shortcut": "Ctrl+K", "action": "Borrar desde cursor hasta fin"},
+      {"shortcut": "Ctrl+W", "action": "Borrar palabra anterior"},
+      {"shortcut": "Ctrl+R", "action": "Búsqueda inversa en historial"},
+      {"shortcut": "Ctrl+Shift+C", "action": "Copiar"},
+      {"shortcut": "Ctrl+Shift+V", "action": "Pegar"},
+      {"shortcut": "Tab", "action": "Autocompletar"},
+      {"shortcut": "Tab Tab", "action": "Mostrar todas las opciones"}
+    ]
+  }
+}

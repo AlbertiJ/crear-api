@@ -1,0 +1,58 @@
+# ============================================
+#  API Lab — .gitignore
+#  Previene commit de archivos locales,
+#  caches, y dependencias que no deben ir al repo.
+# ============================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Flask
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+*.pid
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Entornos locales
+.env
+.env.local
+*.local
+
+# Backups y temporales
+*.bak
+*.tmp
+*.orig
+*.rej
+
+# Builds
+dist/
+build/
+*.egg
