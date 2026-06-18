@@ -10,9 +10,14 @@ Uso:
 """
 import json
 import os
+import random
 import sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
+
+def utc_now_iso():
+    """ISO-8601 en UTC con sufijo 'Z' (compat con formato anterior)."""
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 from flask import Flask, jsonify, request, send_from_directory
 
 # ---------------------------------------------------------------------
@@ -20,6 +25,7 @@ from flask import Flask, jsonify, request, send_from_directory
 # ---------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR.parent / "data"
+DOCS_DIR = BASE_DIR.parent / "docs"
 
 # ---------------------------------------------------------------------
 # APP
@@ -32,7 +38,7 @@ DB = {
     "loaded": {},        # { "privesc": {...}, "commands": {...} }
     "queries": [],       # log de requests
     "history": [],       # cambios de estado
-    "started_at": datetime.utcnow().isoformat() + "Z"
+    "started_at": utc_now_iso()
 }
 
 # ---------------------------------------------------------------------
@@ -50,6 +56,126 @@ DATASETS = {
     "commands":   load_dataset_file("commands.json"),
 }
 
+# ---------------------------------------------------------------------
+# CATÁLOGO DE ENDPOINTS — fuente única para /api/v1/help y /help.txt
+# ---------------------------------------------------------------------
+ENDPOINTS_CATALOG = [
+    # ---- Discovery / reconocimiento ----
+    {"method": "GET",    "path": "/api/v1/discovery",      "cat": "descubrimiento",
+     "short": "Info disclosure inicial del lab",
+     "long":  "Devuelve información básica del lab: nombre, versión, datasets disponibles y cargados, api_root, links clave, conteo total de endpoints. Es el primer pedido que conviene hacer para reconocer el server. Soporta OPTIONS con headers Allow y X-Discovery-Methods (estilo CORS).",
+     "params": [], "example": "curl http://127.0.0.1:5050/api/v1/discovery"},
+    {"method": "GET",    "path": "/api/v1/fingerprint",    "cat": "descubrimiento",
+     "short": "Fingerprint del server (framework, versión, headers)",
+     "long":  "Devuelve el fingerprint del server: framework (Flask), versión exacta, versión de Python, content-type, encoding, si tiene CORS, auth, rate limit y debug mode. Sirve para identificar la pila tecnológica.",
+     "params": [], "example": "curl http://127.0.0.1:5050/api/v1/fingerprint"},
+    {"method": "GET",    "path": "/api/v1/routes",         "cat": "descubrimiento",
+     "short": "Mapa completo de todas las rutas registradas",
+     "long":  "Devuelve la lista completa de rutas registradas en Flask con sus métodos HTTP y nombre interno del endpoint. Es el mapa de superficie de ataque: muestra todo lo que el server sabe hacer.",
+     "params": [], "example": "curl http://127.0.0.1:5050/api/v1/routes"},
+    {"method": "GET",    "path": "/api/v1/health",         "cat": "descubrimiento",
+     "short": "Health check básico del server",
+     "long":  "Devuelve un health check simple: status, hora de arranque, cantidad de datasets disponibles y cargados, y timestamp actual. Útil para monitoreo y para confirmar que el server responde.",
+     "params": [], "example": "curl http://127.0.0.1:5050/api/v1/health"},
+    {"method": "GET",    "path": "/api/v1/severities",     "cat": "descubrimiento",
+     "short": "Lista de severidades con conteo de comandos",
+     "long":  "Devuelve las severidades presentes en los datasets cargados (info, low, medium, high, critical) con la cantidad de comandos que tiene cada una. Si la DB está vacía devuelve un hint para cargar un dataset primero.",
+     "params": [], "example": "curl http://127.0.0.1:5050/api/v1/severities"},
+    {"method": "GET",    "path": "/api/v1/categories",     "cat": "descubrimiento",
+     "short": "Lista de categorías cross-dataset con metadata",
+     "long":  "Devuelve la lista completa de categorías presentes en los datasets cargados, con su dataset, título, severidad y cantidad de comandos. Sirve para entender qué hay cargado antes de filtrar.",
+     "params": [], "example": "curl http://127.0.0.1:5050/api/v1/categories"},
+    {"method": "GET",    "path": "/api/v1/schemas/<name>", "cat": "descubrimiento",
+     "short": "Schema/estructura de un dataset",
+     "long":  "Devuelve la forma/estructura de un dataset: nombre, descripción, lista de categorías, conteo de comandos y categorías, lista de shells (si los tiene), un comando de ejemplo y un esqueleto de la estructura JSON esperada. Sirve para entender qué campos tiene cada item sin tener que cargar todo.",
+     "params": [{"name": "name", "in": "path", "required": True, "type": "string", "desc": "Nombre del dataset (privesc, commands)"}],
+     "example": "curl http://127.0.0.1:5050/api/v1/schemas/privesc"},
+    {"method": "GET",    "path": "/api/v1/search",         "cat": "descubrimiento",
+     "short": "Búsqueda full-text cross-dataset",
+     "long":  "Hace una búsqueda libre sobre los datasets cargados: busca el texto en el comando (cmd), en la descripción (desc) y también en los reverse shells (id, payload, desc). Devuelve hasta 50 resultados combinando comandos y shells.",
+     "params": [
+         {"name": "q",      "in": "query", "required": True,  "type": "string", "desc": "Texto a buscar"},
+         {"name": "limit",  "in": "query", "required": False, "type": "int",    "desc": "Máximo de resultados (default 50)"},
+     ],
+     "example": "curl 'http://127.0.0.1:5050/api/v1/search?q=suid'"},
+    {"method": "GET",    "path": "/api/v1/random",         "cat": "descubrimiento",
+     "short": "Devuelve un comando aleatorio",
+     "long":  "Elige un comando al azar de los datasets cargados. Acepta filtros opcionales por dataset y por severidad. Útil para challenges, repasar o simplemente inspirarse.",
+     "params": [
+         {"name": "dataset",  "in": "query", "required": False, "type": "string", "desc": "Filtrar por dataset (privesc, commands)"},
+         {"name": "severity", "in": "query", "required": False, "type": "string", "desc": "Filtrar por severidad (info, low, medium, high, critical)"},
+     ],
+     "example": "curl 'http://127.0.0.1:5050/api/v1/random?severity=critical'"},
+
+    # ---- Datasets ----
+    {"method": "GET",    "path": "/api/v1/datasets",       "cat": "datasets",
+     "short": "Lista datasets disponibles y cargados",
+     "long":  "Muestra qué datasets existen en la carpeta data/ y cuáles están cargados en la DB en memoria. También devuelve los totales. La DB arranca vacía cada vez que se inicia el server.",
+     "params": [], "example": "curl http://127.0.0.1:5050/api/v1/datasets"},
+    {"method": "GET",    "path": "/api/v1/datasets/<name>","cat": "datasets",
+     "short": "Preview o contenido de un dataset",
+     "long":  "Si el dataset está cargado en la DB, devuelve su contenido completo. Si NO está cargado, devuelve un preview con nombre, descripción, lista de categorías y total de comandos. Sirve para mirar antes de cargar.",
+     "params": [{"name": "name", "in": "path", "required": True, "type": "string", "desc": "Nombre del dataset"}],
+     "example": "curl http://127.0.0.1:5050/api/v1/datasets/privesc"},
+    {"method": "POST",   "path": "/api/v1/datasets/<name>/load", "cat": "datasets",
+     "short": "Carga un dataset en la DB",
+     "long":  "Lee el archivo JSON del dataset desde data/ y lo deja cargado en la DB en memoria. Después de esto, los endpoints de commands, shells, search, etc. funcionan sobre esos datos. Si ya estaba cargado, avisa con 200 en vez de crearlo de nuevo.",
+     "params": [{"name": "name", "in": "path", "required": True, "type": "string", "desc": "Nombre del dataset a cargar"}],
+     "example": "curl -X POST http://127.0.0.1:5050/api/v1/datasets/privesc/load"},
+    {"method": "DELETE", "path": "/api/v1/datasets/<name>","cat": "datasets",
+     "short": "Descarga un dataset de la DB",
+     "long":  "Saca un dataset de la DB en memoria. El archivo JSON en data/ no se toca. Después de esto, los endpoints de commands/shells que dependan de ese dataset dejan de tener resultados.",
+     "params": [{"name": "name", "in": "path", "required": True, "type": "string", "desc": "Nombre del dataset a descargar"}],
+     "example": "curl -X DELETE http://127.0.0.1:5050/api/v1/datasets/privesc"},
+
+    # ---- Commands ----
+    {"method": "GET",    "path": "/api/v1/commands",       "cat": "commands",
+     "short": "Busca comandos con filtros combinables",
+     "long":  "Busca comandos en los datasets cargados. Todos los filtros son opcionales y se pueden combinar. El parámetro limit corta la cantidad de resultados.",
+     "params": [
+         {"name": "cat",      "in": "query", "required": False, "type": "string", "desc": "Categoría exacta (suid, sudo, cron, kernel, etc.)"},
+         {"name": "q",        "in": "query", "required": False, "type": "string", "desc": "Texto libre sobre cmd o desc (case-insensitive)"},
+         {"name": "severity", "in": "query", "required": False, "type": "string", "desc": "Severidad exacta (info, low, medium, high, critical)"},
+         {"name": "dataset",  "in": "query", "required": False, "type": "string", "desc": "Filtrar por dataset"},
+         {"name": "limit",    "in": "query", "required": False, "type": "int",    "desc": "Máximo de resultados (default 100)"},
+     ],
+     "example": "curl 'http://127.0.0.1:5050/api/v1/commands?cat=suid&severity=critical'"},
+    {"method": "GET",    "path": "/api/v1/commands/<id>", "cat": "commands",
+     "short": "Detalle de un comando por ID",
+     "long":  "Devuelve el detalle completo de un comando. El ID tiene formato 'dataset/categoria/indice', por ejemplo 'privesc/suid/0'. Sirve para inspeccionar un resultado puntual después de un listado.",
+     "params": [{"name": "id", "in": "path", "required": True, "type": "string", "desc": "ID con formato dataset/categoria/indice"}],
+     "example": "curl http://127.0.0.1:5050/api/v1/commands/privesc/suid/0"},
+
+    # ---- Shells ----
+    {"method": "GET",    "path": "/api/v1/shells",         "cat": "shells",
+     "short": "Lista todos los reverse shells cargados",
+     "long":  "Devuelve el diccionario completo de reverse shells presentes en los datasets cargados (actualmente viven en el dataset privesc). Cada shell tiene un id, payload y descripción.",
+     "params": [], "example": "curl http://127.0.0.1:5050/api/v1/shells"},
+    {"method": "GET",    "path": "/api/v1/shells/<id>",   "cat": "shells",
+     "short": "Detalle de un reverse shell",
+     "long":  "Devuelve el detalle completo de un shell específico por su id (bash_tcp, python3, nc, perl, php, etc.).",
+     "params": [{"name": "id", "in": "path", "required": True, "type": "string", "desc": "ID del shell (bash_tcp, python3, nc...)"}],
+     "example": "curl http://127.0.0.1:5050/api/v1/shells/python3"},
+
+    # ---- DB / estado ----
+    {"method": "GET",    "path": "/api/v1/db",             "cat": "estado",
+     "short": "Estado completo de la DB",
+     "long":  "Resumen del estado actual: qué datasets hay cargados, total de comandos, total de categorías, cantidad de queries, cambios de estado, hora de arranque.",
+     "params": [], "example": "curl http://127.0.0.1:5050/api/v1/db"},
+    {"method": "DELETE", "path": "/api/v1/db",             "cat": "estado",
+     "short": "Vacía la DB por completo",
+     "long":  "Saca TODOS los datasets de la DB. Equivale a un 'reset' total. Los archivos JSON en data/ no se modifican, solo se olvida lo que estaba en memoria.",
+     "params": [], "example": "curl -X DELETE http://127.0.0.1:5050/api/v1/db"},
+    {"method": "GET",    "path": "/api/v1/queries",        "cat": "estado",
+     "short": "Log de las últimas queries",
+     "long":  "Devuelve el log de las últimas 50 queries recibidas con método, path y timestamp. Sirve para análisis Blue Team: ver qué pidió cada cliente.",
+     "params": [], "example": "curl http://127.0.0.1:5050/api/v1/queries"},
+    {"method": "GET",    "path": "/api/v1/stats",          "cat": "estado",
+     "short": "Estadísticas agregadas del lab",
+     "long":  "Conteo agregado de comandos por categoría y por severidad, y total de queries registradas.",
+     "params": [], "example": "curl http://127.0.0.1:5050/api/v1/stats"},
+]
+
 # Si querés sumar más datasets, agregalos al directorio data/
 
 # ---------------------------------------------------------------------
@@ -59,7 +185,7 @@ def log_query(method, path):
     DB["queries"].append({
         "method": method,
         "path": path,
-        "ts": datetime.utcnow().isoformat() + "Z"
+        "ts": utc_now_iso()
     })
 
 def count_commands(ds):
@@ -82,23 +208,78 @@ def index():
 @app.route("/api/v1/help")
 def help():
     log_query("GET", "/api/v1/help")
+    # Agrupar por categoría para que la respuesta sea más fácil de leer
+    by_cat = {}
+    for ep in ENDPOINTS_CATALOG:
+        by_cat.setdefault(ep["cat"], []).append({
+            "method":  ep["method"],
+            "path":    ep["path"],
+            "short":   ep["short"],
+            "long":    ep["long"],
+            "params":  ep["params"],
+            "example": ep["example"]
+        })
     return jsonify({
         "lab": "API Lab — Pentesting & Linux",
-        "endpoints": [
-            {"method": "GET",    "path": "/api/v1/datasets",              "desc": "Lista datasets disponibles y cargados en DB"},
-            {"method": "GET",    "path": "/api/v1/datasets/<name>",       "desc": "Preview o contenido completo de un dataset"},
-            {"method": "POST",   "path": "/api/v1/datasets/<name>/load",  "desc": "Carga un dataset en la DB"},
-            {"method": "DELETE", "path": "/api/v1/datasets/<name>",       "desc": "Descarga un dataset de la DB"},
-            {"method": "GET",    "path": "/api/v1/commands",              "desc": "Busca comandos. Params: ?cat= ?q= ?severity= ?dataset="},
-            {"method": "GET",    "path": "/api/v1/commands/<id>",         "desc": "Detalle de un comando por ID"},
-            {"method": "GET",    "path": "/api/v1/shells",                "desc": "Lista reverse shells"},
-            {"method": "GET",    "path": "/api/v1/shells/<id>",           "desc": "Detalle de un shell"},
-            {"method": "GET",    "path": "/api/v1/db",                    "desc": "Estado completo de la DB"},
-            {"method": "DELETE", "path": "/api/v1/db",                    "desc": "Vacía la DB"},
-            {"method": "GET",    "path": "/api/v1/queries",               "desc": "Log de queries realizadas"},
-            {"method": "GET",    "path": "/api/v1/stats",                 "desc": "Estadísticas del lab"}
-        ]
+        "version": "1.1.0",
+        "manual_html": "/manual",
+        "help_texto_plano": "/api/v1/help.txt",
+        "categorias": by_cat,
+        "endpoints_count": len(ENDPOINTS_CATALOG)
     })
+
+@app.route("/api/v1/help.txt")
+def help_txt():
+    """Ayuda completa en texto plano, ideal para leer en la terminal."""
+    log_query("GET", "/api/v1/help.txt")
+    lines = []
+    lines.append("=" * 72)
+    lines.append("API LAB — Pentesting & Linux  (v1.1.0)")
+    lines.append("=" * 72)
+    lines.append("")
+    lines.append("Manual HTML completo:    http://127.0.0.1:5050/manual")
+    lines.append("Esta ayuda (formato JSON): http://127.0.0.1:5050/api/v1/help")
+    lines.append("")
+    # Agrupar y mostrar por categoría
+    cats = {}
+    for ep in ENDPOINTS_CATALOG:
+        cats.setdefault(ep["cat"], []).append(ep)
+    for cat, eps in cats.items():
+        lines.append("-" * 72)
+        lines.append(f"CATEGORÍA: {cat.upper()}")
+        lines.append("-" * 72)
+        for ep in eps:
+            lines.append("")
+            lines.append(f"  {ep['method']:6s}  {ep['path']}")
+            lines.append(f"  {ep['short']}")
+            lines.append("")
+            # wrap descripción larga a 70 chars
+            for paragraph in ep["long"].split("\n"):
+                lines.append("    " + paragraph.strip())
+            if ep["params"]:
+                lines.append("")
+                lines.append("    Parámetros:")
+                for p in ep["params"]:
+                    req = "obligatorio" if p.get("required") else "opcional"
+                    lines.append(f"      - {p['name']} ({p['type']}, {req}, en {p['in']}): {p['desc']}")
+            lines.append("")
+            lines.append(f"    Ejemplo: {ep['example']}")
+            lines.append("")
+    lines.append("=" * 72)
+    lines.append("Para más detalles y paso a paso, abrí el manual HTML:")
+    lines.append("    http://127.0.0.1:5050/manual")
+    lines.append("=" * 72)
+    response = app.response_class("\n".join(lines), mimetype="text/plain; charset=utf-8")
+    return response
+
+@app.route("/manual")
+@app.route("/manual.html")
+def manual():
+    """Sirve el manual HTML independiente que vive en docs/."""
+    manual_path = DOCS_DIR / "MANUAL.html"
+    if not manual_path.exists():
+        return jsonify({"error": "Manual no encontrado", "path_esperado": str(manual_path)}), 404
+    return send_from_directory(str(manual_path.parent), manual_path.name)
 
 @app.route("/api/v1/datasets", methods=["GET"])
 def list_datasets():
@@ -134,7 +315,7 @@ def load_dataset(name):
     if name in DB["loaded"]:
         return jsonify({"msg": f"Dataset '{name}' ya estaba cargado", "loaded_at": DB["loaded"][name]["loaded_at"]}), 200
     payload = json.loads(json.dumps(DATASETS[name]))  # deep copy
-    payload["loaded_at"] = datetime.utcnow().isoformat() + "Z"
+    payload["loaded_at"] = utc_now_iso()
     DB["loaded"][name] = payload
     DB["history"].append({"action": "load", "dataset": name, "ts": payload["loaded_at"]})
     return jsonify({
@@ -150,7 +331,7 @@ def unload_dataset(name):
     if name not in DB["loaded"]:
         return jsonify({"error": f"Dataset '{name}' no está cargado"}), 404
     del DB["loaded"][name]
-    DB["history"].append({"action": "unload", "dataset": name, "ts": datetime.utcnow().isoformat() + "Z"})
+    DB["history"].append({"action": "unload", "dataset": name, "ts": utc_now_iso()})
     return jsonify({"msg": f"Dataset '{name}' descargado de la DB"})
 
 @app.route("/api/v1/commands", methods=["GET"])
@@ -258,7 +439,7 @@ def db_flush():
     log_query("DELETE", "/api/v1/db")
     prev = len(DB["loaded"])
     DB["loaded"] = {}
-    DB["history"].append({"action": "flush", "ts": datetime.utcnow().isoformat() + "Z"})
+    DB["history"].append({"action": "flush", "ts": utc_now_iso()})
     return jsonify({"msg": f"DB vaciada. {prev} datasets eliminados."})
 
 @app.route("/api/v1/queries")
@@ -282,6 +463,232 @@ def stats():
     })
 
 # ---------------------------------------------------------------------
+# DISCOVERY — endpoints para reconocimiento de la API (pentest recon)
+# ---------------------------------------------------------------------
+@app.route("/api/v1/discovery", methods=["GET", "OPTIONS"])
+def discovery():
+    log_query(request.method, "/api/v1/discovery")
+    info = {
+        "lab": "API Lab — Pentesting & Linux",
+        "version": "1.1.0",
+        "api_root": "/api/v1",
+        "docs": "/api/v1/help",
+        "fingerprint": "/api/v1/fingerprint",
+        "routes": "/api/v1/routes",
+        "datasets_available": [k for k, v in DATASETS.items() if v is not None],
+        "datasets_loaded": list(DB["loaded"].keys()),
+        "endpoints_count": len(list(app.url_map.iter_rules())),
+        "started_at": DB["started_at"]
+    }
+    if request.method == "OPTIONS":
+        # CORS-style: anuncia métodos permitidos
+        resp = jsonify(info)
+        resp.headers["Allow"] = "GET, OPTIONS"
+        resp.headers["X-Discovery-Methods"] = "GET, OPTIONS"
+        return resp
+    return jsonify(info)
+
+@app.route("/api/v1/fingerprint", methods=["GET"])
+def fingerprint():
+    log_query("GET", "/api/v1/fingerprint")
+    from importlib.metadata import version as pkg_version
+    return jsonify({
+        "server": "Werkzeug (Flask dev server)",
+        "framework": "Flask",
+        "framework_version": pkg_version("flask"),
+        "python_version": sys.version.split()[0],
+        "content_type": "application/json",
+        "encoding": "utf-8",
+        "cors": False,
+        "auth_required": False,
+        "rate_limit": False,
+        "debug_mode": app.debug
+    })
+
+@app.route("/api/v1/routes", methods=["GET"])
+def list_routes():
+    log_query("GET", "/api/v1/routes")
+    routes = []
+    for rule in sorted(app.url_map.iter_rules(), key=lambda r: r.rule):
+        routes.append({
+            "rule": rule.rule,
+            "methods": sorted(m for m in rule.methods if m not in ("HEAD", "OPTIONS")),
+            "endpoint": rule.endpoint
+        })
+    return jsonify({"count": len(routes), "routes": routes})
+
+@app.route("/api/v1/health", methods=["GET"])
+def health():
+    return jsonify({
+        "status": "ok",
+        "uptime_since": DB["started_at"],
+        "datasets_available": sum(1 for v in DATASETS.values() if v is not None),
+        "datasets_loaded": len(DB["loaded"]),
+        "ts": utc_now_iso()
+    })
+
+@app.route("/api/v1/severities", methods=["GET"])
+def list_severities():
+    log_query("GET", "/api/v1/severities")
+    sev_counts = {}
+    for ds in DB["loaded"].values():
+        for cat in (ds.get("categories") or {}).values():
+            sev = cat.get("severity", "unknown")
+            sev_counts[sev] = sev_counts.get(sev, 0) + len(cat.get("commands", []))
+    return jsonify({
+        "count": len(sev_counts),
+        "severities": sev_counts,
+        "hint": "Cargá un dataset primero: POST /api/v1/datasets/privesc/load"
+    })
+
+@app.route("/api/v1/categories", methods=["GET"])
+def list_categories():
+    log_query("GET", "/api/v1/categories")
+    items = []
+    for ds_name, ds in DB["loaded"].items():
+        for cat_key, cat in (ds.get("categories") or {}).items():
+            items.append({
+                "dataset": ds_name,
+                "key": cat_key,
+                "title": cat.get("title"),
+                "severity": cat.get("severity"),
+                "commands": len(cat.get("commands", []))
+            })
+    return jsonify({
+        "count": len(items),
+        "categories": items,
+        "hint": "Cargá un dataset primero: POST /api/v1/datasets/privesc/load"
+    })
+
+@app.route("/api/v1/schemas/<name>", methods=["GET"])
+def dataset_schema(name):
+    log_query("GET", f"/api/v1/schemas/{name}")
+    ds = None
+    source = None
+    if name in DB["loaded"]:
+        ds = DB["loaded"][name]
+        source = "db"
+    elif name in DATASETS and DATASETS[name] is not None:
+        ds = DATASETS[name]
+        source = "remote"
+    if ds is None:
+        return jsonify({"error": f"Dataset '{name}' no existe", "available": list(DATASETS.keys())}), 404
+    cats = ds.get("categories") or {}
+    sample_cmd = None
+    if cats:
+        first_cat = next(iter(cats.values()))
+        cmds = first_cat.get("commands") or []
+        if cmds:
+            sample_cmd = cmds[0]
+    shells_keys = list((ds.get("shells") or {}).keys())
+    return jsonify({
+        "name": ds.get("name"),
+        "source": source,
+        "description": ds.get("description"),
+        "structure": {
+            "name": "string",
+            "description": "string",
+            "categories": {
+                "<key>": {
+                    "title": "string",
+                    "severity": "string (info|low|medium|high|critical)",
+                    "commands": [
+                        {
+                            "cmd": "string",
+                            "desc": "string"
+                        }
+                    ]
+                }
+            },
+            "shells": {
+                "<id>": {
+                    "payload": "string",
+                    "desc": "string"
+                }
+            },
+            "loaded_at": "string (ISO-8601 UTC) — sólo si viene de db"
+        },
+        "categories": list(cats.keys()),
+        "commands_count": count_commands(ds),
+        "categories_count": count_categories(ds),
+        "shells_keys": shells_keys,
+        "sample_command": sample_cmd
+    })
+
+@app.route("/api/v1/search", methods=["GET"])
+def global_search():
+    log_query("GET", "/api/v1/search")
+    if not DB["loaded"]:
+        return jsonify({
+            "error": "DB vacía",
+            "hint": "Cargá un dataset primero: POST /api/v1/datasets/privesc/load"
+        }), 503
+    q = request.args.get("q", "").lower().strip()
+    if not q:
+        return jsonify({"error": "Parámetro 'q' requerido", "example": "/api/v1/search?q=python"}), 400
+    limit = int(request.args.get("limit", 50))
+    results = []
+    for ds_name, ds in DB["loaded"].items():
+        for cat_key, cat_data in (ds.get("categories") or {}).items():
+            for idx, cmd in enumerate(cat_data.get("commands", [])):
+                if q in cmd.get("cmd", "").lower() or q in cmd.get("desc", "").lower():
+                    results.append({
+                        "type": "command",
+                        "id": f"{ds_name}/{cat_key}/{idx}",
+                        "dataset": ds_name,
+                        "category": cat_key,
+                        "severity": cat_data.get("severity"),
+                        "cmd": cmd.get("cmd"),
+                        "desc": cmd.get("desc")
+                    })
+        for shell_id, shell_data in (ds.get("shells") or {}).items():
+            if q in shell_id.lower() or q in str(shell_data).lower():
+                results.append({
+                    "type": "shell",
+                    "id": shell_id,
+                    "dataset": ds_name,
+                    "payload": shell_data.get("payload"),
+                    "desc": shell_data.get("desc")
+                })
+    return jsonify({
+        "q": q,
+        "count": len(results),
+        "returned": min(limit, len(results)),
+        "results": results[:limit]
+    })
+
+@app.route("/api/v1/random", methods=["GET"])
+def random_command():
+    log_query("GET", "/api/v1/random")
+    if not DB["loaded"]:
+        return jsonify({
+            "error": "DB vacía",
+            "hint": "Cargá un dataset primero: POST /api/v1/datasets/privesc/load"
+        }), 503
+    dataset = request.args.get("dataset")
+    severity = request.args.get("severity")
+    pool = []
+    for ds_name, ds in DB["loaded"].items():
+        if dataset and dataset != ds_name:
+            continue
+        for cat_key, cat_data in (ds.get("categories") or {}).items():
+            if severity and cat_data.get("severity") != severity:
+                continue
+            for idx, cmd in enumerate(cat_data.get("commands", [])):
+                pool.append({
+                    "id": f"{ds_name}/{cat_key}/{idx}",
+                    "dataset": ds_name,
+                    "category": cat_key,
+                    "category_title": cat_data.get("title"),
+                    "severity": cat_data.get("severity"),
+                    "cmd": cmd.get("cmd"),
+                    "desc": cmd.get("desc")
+                })
+    if not pool:
+        return jsonify({"error": "Sin resultados con esos filtros"}), 404
+    return jsonify(random.choice(pool))
+
+# ---------------------------------------------------------------------
 # STATIC
 # ---------------------------------------------------------------------
 @app.route("/<path:filename>")
@@ -292,7 +699,7 @@ def static_files(filename):
 # MAIN
 # ---------------------------------------------------------------------
 if __name__ == "__main__":
-    port = 5000
+    port = 5050
     host = "127.0.0.1"
     if "--host" in sys.argv:
         i = sys.argv.index("--host")

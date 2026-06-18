@@ -3,9 +3,14 @@
 > Un entorno portátil para practicar **reconocimiento y consumo de APIs REST** usando datos reales de pentesting y administración Linux.
 
 ![status](https://img.shields.io/badge/status-active-success)
+![version](https://img.shields.io/badge/version-1.1.0-00ff9c)
 ![python](https://img.shields.io/badge/python-3.8%2B-blue)
+![flask](https://img.shields.io/badge/flask-3.x-000000)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![offline](https://img.shields.io/badge/100%25-offline-orange)
+![manual](https://img.shields.io/badge/manual-HTML-ff3ec8)
+
+> 🆕 **v1.1.0** — 9 endpoints nuevos de descubrimiento (`/discovery`, `/fingerprint`, `/routes`, `/health`, `/severities`, `/categories`, `/schemas/<name>`, `/search`, `/random`). Puerto default **5050**. Manual HTML independiente en `docs/MANUAL.html`. [`/api/v1/help.txt`](#-ayuda-y-documentación) devuelve todo el catálogo en texto plano.
 
 ---
 
@@ -43,13 +48,16 @@ Es como un **CTF de pentesting web**, pero la "flag" es entender cómo se consum
 - 🌑 **Cyberpunk UI** (Opción 1): dark mode, consola integrada, estadísticas en vivo
 - 📊 **Stats en tiempo real** (Opción 2): logs de queries, estado de la DB, filtros
 - 🔌 **API REST real** (Opción 2): usás `curl`, Postman, fetch del navegador — lo que sea
+- 🛰️ **Endpoints de descubrimiento** (Opción 2): `/discovery`, `/fingerprint`, `/routes`, `/search`, `/random` y más
+- 📖 **Manual HTML independiente** en `docs/MANUAL.html` — explicado paso a paso, en español
+- 📄 **Help en texto plano** en `/api/v1/help.txt` — ideal para leer en la terminal
 
 ---
 
 ## 📂 Estructura del proyecto
 
 ```
-api-lab/
+crear-api/
 ├── data/                      # Datasets en JSON (puros datos, editables)
 │   ├── privesc.json           # 12 categorías de escalada de privilegios
 │   └── commands.json          # 9 categorías de comandos Linux
@@ -62,6 +70,8 @@ api-lab/
 │   └── static_index.html      # Frontend del lab
 │
 ├── docs/                      # Documentación extendida
+│   ├── MANUAL.html            # 🆕 Manual para principiantes (HTML)
+│   └── README.md              # Roadmap de docs
 │
 ├── .gitignore                 # Exclusiones para Git
 ├── LICENSE                    # MIT
@@ -84,20 +94,39 @@ api-lab/
 
 ```bash
 # 1. Clonar
-git clone https://github.com/AlbertiJ/api-lab.git
-cd api-lab/option2
+git clone https://github.com/AlbertiJ/crear-api.git
+cd crear-api/option2
 
 # 2. Instalar dependencia
 pip install flask
 
 # 3. Levantar servidor
 python lab.py
+# (o python lab.py --port 5050 para otro puerto)
 
 # 4. Abrir navegador
-# → http://localhost:5000
+# → http://localhost:5050
 ```
 
 > **Ideal para**: practicar el flujo real de cliente/servidor, experimentar con `curl`, integrar con Postman.
+>
+> 📖 Si nunca tocaste una API, abrí [`docs/MANUAL.html`](docs/MANUAL.html) primero: te lleva de la mano paso a paso, en español, con diagramas.
+
+### 🆕 v1.1.0 — endpoints de descubrimiento
+
+Pensado para practicar **reconocimiento de APIs** (estilo pentest): lo primero que hacés es mapear la superficie del server. Esta versión suma:
+
+- `GET /api/v1/discovery` — info disclosure inicial
+- `GET /api/v1/fingerprint` — fingerprint del stack
+- `GET /api/v1/routes` — mapa completo de rutas
+- `GET /api/v1/health` — health check
+- `GET /api/v1/severities` — severidades con conteo
+- `GET /api/v1/categories` — categorías cross-dataset
+- `GET /api/v1/schemas/<name>` — schema/forma de un dataset
+- `GET /api/v1/search?q=...` — búsqueda full-text
+- `GET /api/v1/random` — comando aleatorio
+
+Empezá siempre por `/api/v1/discovery` y después `/api/v1/routes` para ver la superficie completa.
 
 ---
 
@@ -150,9 +179,22 @@ curl "http://localhost:5000/api/v1/shells" | jq '.shells.python3'
 
 ## 📡 Endpoints completos
 
+> Para descripciones largas, parámetros y ejemplos de cada endpoint, andá a:
+> - 🖥️ **HTML**: <http://localhost:5050/api/v1/help>
+> - 📄 **Texto plano**: `curl http://localhost:5050/api/v1/help.txt`
+> - 📖 **Manual completo**: <http://localhost:5050/manual>
+
 | Método | Path | Descripción |
 |--------|------|-------------|
-| `GET`    | `/api/v1/help` | Lista todos los endpoints |
+| `GET`    | `/api/v1/discovery` | Info disclosure inicial del lab |
+| `GET`    | `/api/v1/fingerprint` | Fingerprint del server (framework, Python, encoding) |
+| `GET`    | `/api/v1/routes` | Mapa completo de todas las rutas registradas |
+| `GET`    | `/api/v1/health` | Health check básico |
+| `GET`    | `/api/v1/severities` | Severidades con conteo de comandos |
+| `GET`    | `/api/v1/categories` | Categorías cross-dataset con metadata |
+| `GET`    | `/api/v1/schemas/<name>` | Schema/estructura de un dataset |
+| `GET`    | `/api/v1/search` | Búsqueda full-text (?q=, ?limit=) sobre commands y shells |
+| `GET`    | `/api/v1/random` | Comando aleatorio (?dataset=, ?severity=) |
 | `GET`    | `/api/v1/datasets` | Datasets disponibles vs cargados |
 | `GET`    | `/api/v1/datasets/<name>` | Preview o contenido de un dataset |
 | `POST`   | `/api/v1/datasets/<name>/load` | Carga dataset a la DB |
@@ -165,6 +207,8 @@ curl "http://localhost:5000/api/v1/shells" | jq '.shells.python3'
 | `DELETE` | `/api/v1/db` | Vacía la DB |
 | `GET`    | `/api/v1/queries` | Log de queries recientes |
 | `GET`    | `/api/v1/stats` | Estadísticas agregadas |
+| `GET`    | `/manual` | Manual HTML para principiantes |
+| `GET`    | `/api/v1/help.txt` | Catálogo completo en texto plano |
 
 ---
 
@@ -296,6 +340,20 @@ Este lab se nutre de proyectos open source de la comunidad. Toda la información
 - **Linux para Blue Team** (vía Vlad Nicusor Sarpe, LinkedIn) — Perspectiva defensiva de los mismos vectores
 - **OSINT en GitHub** (vía Kenny Felix, LinkedIn) — Para expandir datasets desde fuentes públicas
 - **Reverse shells Windows** (vía Valvis Defense, LinkedIn) — Perspectiva adicional sobre shells
+
+---
+
+## 📖 Ayuda y documentación
+
+Cuando el server está corriendo hay tres formas de consultar la ayuda:
+
+| Dónde | Qué es | Cuándo usarlo |
+|---|---|---|
+| <http://localhost:5050/manual> | Manual HTML para principiantes | Si nunca tocaste una API o querés el paso a paso visual |
+| <http://localhost:5050/api/v1/help> | Help en JSON, agrupado por categoría | Si querés un objeto parseable, agrupado por `descubrimiento / datasets / commands / shells / estado` |
+| `curl http://localhost:5050/api/v1/help.txt` | Help en texto plano formateado | Si estás en la terminal y querés leer el catálogo con `less` o `cat` |
+
+El manual HTML (`docs/MANUAL.html`) es **un archivo independiente**: lo podés abrir directamente con doble click sin tener el server levantado. También lo sirve el server en `/manual` para tenerlo todo junto.
 
 ---
 

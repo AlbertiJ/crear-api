@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Lab — Manual para principiantes</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --bg-2: #111827;
+    --panel: #1a2030;
+    --border: #2a3548;
+    --text: #e6edf3;
+    --muted: #8b96a8;
+    --neon: #00ff9c;
+    --neon-2: #00d4ff;
+    --magenta: #ff3ec8;
+    --yellow: #ffd83d;
+    --red: #ff5566;
+    --orange: #ff8c42;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  body {
+    background:
+      radial-gradient(ellipse at top, rgba(0,255,156,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom, rgba(255,62,200,0.05) 0%, transparent 50%),
+      var(--bg);
+  }
+  code, pre, .cmd {
+    font-family: "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+  }
+  pre, .code {
+    background: #0d1421;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--neon);
+    border-radius: 6px;
+    padding: 14px 18px;
+    overflow-x: auto;
+    color: #d4e0f0;
+    font-size: 14px;
+  }
+  pre .comment { color: var(--muted); }
+  pre .key { color: var(--neon); }
+  pre .str { color: var(--yellow); }
+
+  /* ===== Portada ===== */
+  .cover {
+    text-align: center;
+    padding: 80px 20px 60px;
+    border-bottom: 1px solid var(--border);
+  }
+  .cover .badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border: 1px solid var(--neon);
+    color: var(--neon);
+    border-radius: 100px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .cover h1 {
+    font-size: 52px;
+    margin: 0 0 12px;
+    background: linear-gradient(90deg, var(--neon), var(--neon-2), var(--magenta));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    letter-spacing: -1px;
+  }
+  .cover h2 {
+    font-size: 18px;
+    color: var(--muted);
+    font-weight: 400;
+    margin: 0 0 32px;
+  }
+  .cover .meta {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .cover svg { display: block; margin: 40px auto 0; max-width: 100%; height: auto; }
+
+  /* ===== Layout general ===== */
+  main { max-width: 920px; margin: 0 auto; padding: 40px 24px 80px; }
+  section { margin-bottom: 64px; scroll-margin-top: 24px; }
+  h2 {
+    font-size: 32px;
+    margin: 0 0 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  h2 .icon {
+    width: 38px; height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--panel);
+    border: 1px solid var(--neon);
+    border-radius: 8px;
+    font-size: 20px;
+  }
+  h3 {
+    font-size: 20px;
+    margin: 32px 0 12px;
+    color: var(--neon-2);
+  }
+  p { margin: 12px 0; color: #c8d1e0; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 6px 0; }
+  strong { color: var(--neon); }
+  em { color: var(--yellow); font-style: normal; }
+  a { color: var(--neon-2); text-decoration: none; border-bottom: 1px dotted var(--neon-2); }
+
+  /* ===== Cajas / recuadros ===== */
+  .box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 20px 0;
+    position: relative;
+  }
+  .box .label {
+    position: absolute;
+    top: -10px; left: 16px;
+    padding: 2px 10px;
+    background: var(--panel);
+    border: 1px solid;
+    border-radius: 100px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .box.tip { border-color: var(--neon); }
+  .box.tip .label { color: var(--neon); border-color: var(--neon); }
+  .box.eye { border-color: var(--yellow); }
+  .box.eye .label { color: var(--yellow); border-color: var(--yellow); }
+  .box.warn { border-color: var(--red); }
+  .box.warn .label { color: var(--red); border-color: var(--red); }
+  .box.info { border-color: var(--neon-2); }
+  .box.info .label { color: var(--neon-2); border-color: var(--neon-2); }
+  .box.magic { border-color: var(--magenta); }
+  .box.magic .label { color: var(--magenta); border-color: var(--magenta); }
+  .box p:last-child { margin-bottom: 0; }
+  .box p:first-child { margin-top: 0; }
+
+  /* ===== Pasos numerados ===== */
+  .step {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    margin: 32px 0;
+    padding: 24px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    position: relative;
+  }
+  .step .num {
+    flex-shrink: 0;
+    width: 64px; height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--neon), var(--neon-2));
+    color: var(--bg);
+    font-size: 28px;
+    font-weight: 800;
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(0,255,156,0.25);
+  }
+  .step.magenta .num { background: linear-gradient(135deg, var(--magenta), var(--orange)); }
+  .step .body { flex: 1; min-width: 0; }
+  .step h3 {
+    margin: 0 0 10px;
+    color: var(--text);
+    font-size: 22px;
+  }
+  .step p { margin: 8px 0; }
+
+  /* ===== Tabla ===== */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    background: var(--panel);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  th, td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    background: #1f2937;
+    color: var(--neon);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+  }
+  tr:last-child td { border-bottom: none; }
+  td code { color: var(--yellow); }
+
+  /* ===== Glosario ===== */
+  .glossary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 20px 0;
+  }
+  @media (max-width: 700px) { .glossary { grid-template-columns: 1fr; } }
+  .term {
+    background: var(--panel);
+    border-left: 3px solid var(--magenta);
+    border-radius: 6px;
+    padding: 12px 16px;
+  }
+  .term .k { color: var(--neon); font-weight: 700; display: block; margin-bottom: 4px; }
+  .term .v { color: var(--muted); font-size: 14px; }
+
+  /* ===== Indice ===== */
+  .toc {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 32px 0;
+  }
+  .toc h3 { margin: 0 0 12px; color: var(--neon); }
+  .toc ol { columns: 2; column-gap: 30px; }
+  @media (max-width: 700px) { .toc ol { columns: 1; } }
+  .toc a { color: var(--text); border: none; }
+  .toc a:hover { color: var(--neon); }
+
+  /* ===== SVG container ===== */
+  .diagram {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 24px 0;
+    text-align: center;
+  }
+  .diagram svg { max-width: 100%; height: auto; }
+  .diagram .caption {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 12px;
+    font-style: italic;
+  }
+
+  /* ===== footer ===== */
+  footer {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    font-size: 14px;
+  }
+  footer .big { font-size: 24px; margin-bottom: 8px; }
+
+  /* ===== helpers ===== */
+  .emoji-big { font-size: 28px; vertical-align: middle; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .col { flex: 1; min-width: 250px; }
+</style>
+</head>
+<body>
+
+<!-- =========================================================== -->
+<!-- PORTADA                                                     -->
+<!-- =========================================================== -->
+<header class="cover">
+  <span class="badge">v 1.1.0 · Manual oficial</span>
+  <h1>API Lab</h1>
+  <h2>Manual para principiantes · explicado paso a paso</h2>
+  <div class="meta">
+    Hecho para gente que nunca tocó una API en su vida 🚀
+  </div>
+  <!-- Diagrama decorativo de portada: servidor + cliente -->
+  <svg viewBox="0 0 600 220" xmlns="http://www.w3.org/2000/svg" style="max-width:560px;">
+    <defs>
+      <linearGradient id="g1" x1="0" x2="1">
+        <stop offset="0" stop-color="#00ff9c"/>
+        <stop offset="1" stop-color="#00d4ff"/>
+      </linearGradient>
+      <linearGradient id="g2" x1="0" x2="1">
+        <stop offset="0" stop-color="#ff3ec8"/>
+        <stop offset="1" stop-color="#ff8c42"/>
+      </linearGradient>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0,0 L10,5 L0,10 z" fill="#00ff9c"/>
+      </marker>
+    </defs>
+    <!-- Cliente (navegador) -->
+    <rect x="40" y="60" width="140" height="100" rx="10" fill="#1a2030" stroke="url(#g1)" stroke-width="2"/>
+    <circle cx="60" cy="80" r="4" fill="#ff5566"/>
+    <circle cx="74" cy="80" r="4" fill="#ffd83d"/>
+    <circle cx="88" cy="80" r="4" fill="#00ff9c"/>
+    <text x="110" y="120" text-anchor="middle" fill="#00ff9c" font-size="20" font-weight="700">Navegador</text>
+    <text x="110" y="142" text-anchor="middle" fill="#8b96a8" font-size="12">vos</text>
+    <!-- Server -->
+    <rect x="420" y="60" width="140" height="100" rx="10" fill="#1a2030" stroke="url(#g2)" stroke-width="2"/>
+    <rect x="440" y="80" width="100" height="6" rx="2" fill="#ff3ec8"/>
+    <rect x="440" y="92" width="100" height="6" rx="2" fill="#ff3ec8" opacity="0.6"/>
+    <rect x="440" y="104" width="100" height="6" rx="2" fill="#ff3ec8" opacity="0.3"/>
+    <text x="490" y="138" text-anchor="middle" fill="#ff3ec8" font-size="16" font-weight="700">API Lab</text>
+    <text x="490" y="155" text-anchor="middle" fill="#8b96a8" font-size="11">datos + respuestas</text>
+    <!-- Flecha ida -->
+    <line x1="190" y1="100" x2="410" y2="100" stroke="#00ff9c" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="300" y="92" text-anchor="middle" fill="#00ff9c" font-size="13" font-weight="600">preguntas</text>
+    <!-- Flecha vuelta -->
+    <line x1="410" y1="130" x2="190" y2="130" stroke="#ff3ec8" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+    <text x="300" y="148" text-anchor="middle" fill="#ff3ec8" font-size="13" font-weight="600">respuestas</text>
+  </svg>
+</header>
+
+<main>
+
+<!-- =========================================================== -->
+<!-- INDICE                                                      -->
+<!-- =========================================================== -->
+<nav class="toc">
+  <h3>📑 Contenido</h3>
+  <ol>
+    <li><a href="#que-es">¿Qué es API Lab?</a></li>
+    <li><a href="#antes-de-empezar">Antes de empezar</a></li>
+    <li><a href="#mapa">Cómo está organizado</a></li>
+    <li><a href="#paso-1">Paso 1 — Abrir la terminal</a></li>
+    <li><a href="#paso-2">Paso 2 — Ir a la carpeta</a></li>
+    <li><a href="#paso-3">Paso 3 — Instalar Flask</a></li>
+    <li><a href="#paso-4">Paso 4 — Arrancar el server</a></li>
+    <li><a href="#paso-5">Paso 5 — Abrir el navegador</a></li>
+    <li><a href="#paso-6">Paso 6 — Cargar los datos</a></li>
+    <li><a href="#paso-7">Paso 7 — Explorar</a></li>
+    <li><a href="#paso-8">Paso 8 — Apagar</a></li>
+    <li><a href="#problemas">Si algo no anda</a></li>
+    <li><a href="#glosario">Glosario</a></li>
+  </ol>
+</nav>
+
+<!-- =========================================================== -->
+<!-- 1. QUE ES                                                   -->
+<!-- =========================================================== -->
+<section id="que-es">
+  <h2><span class="icon">🤔</span>¿Qué es API Lab?</h2>
+
+  <p>Imaginá que querés aprender a manejar un auto. ¿Qué necesitás? <strong>Un auto para practicar</strong>. No el de tu viejo, no el de tu tía, no un auto alquilado. Uno donde podés meter la mano en el motor, chocar contra un colchón y no pasa nada.</p>
+
+  <p>Bueno, <strong>API Lab es tu "auto de prácticas" pero para aprender cómo funcionan las APIs</strong>.</p>
+
+  <div class="box tip">
+    <span class="label">Analogía</span>
+    <p>Una <strong>API</strong> es como un mozo en un restaurante. Vos le hacés preguntas (pedís la carta), el mozo va a la cocina, y te trae la respuesta (tu comida). Acá el "mozo" es API Lab: vive en tu computadora, le hacés preguntas por internet, y te contesta con datos.</p>
+  </div>
+
+  <p>En este caso los datos son reales y útiles:</p>
+  <ul>
+    <li>🔓 <strong>Técnicas de escalada de privilegios en Linux</strong> (para practicar pentesting)</li>
+    <li>🐧 <strong>Comandos básicos de Linux</strong> (para uso diario)</li>
+    <li>🐚 <strong>Reverse shells</strong> (para entender cómo se ven los "shells inversos")</li>
+  </ul>
+
+  <p>Todo corre <strong>en tu propia máquina, sin internet, sin riesgo</strong>. Podés romper todo lo que quieras que no pasa nada.</p>
+</section>
+
+<!-- =========================================================== -->
+<!-- 2. ANTES DE EMPEZAR                                         -->
+<!-- =========================================================== -->
+<section id="antes-de-empezar">
+  <h2><span class="icon">📋</span>Antes de empezar</h2>
+
+  <p>Necesitás tener <strong>dos cosas</strong> en tu computadora:</p>
+
+  <div class="row">
+    <div class="col">
+      <div class="box info">
+        <span class="label">Requisito 1</span>
+        <p><strong>Python 3.8 o más nuevo</strong></p>
+        <p>Para verificar si lo tenés, abrí una terminal y escribí:</p>
+        <pre><code>python --version</code></pre>
+        <p>Si te muestra algo como <code>Python 3.10.0</code> o más alto, estás listo. Si te dice "no se reconoce", hay que instalarlo desde <a href="https://python.org" target="_blank">python.org</a>.</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="box info">
+        <span class="label">Requisito 2</span>
+        <p><strong>Un navegador</strong></p>
+        <p>Chrome, Firefox, Edge, el que sea. Sirve cualquiera.</p>
+        <p>También vas a necesitar <strong>curl</strong> para los ejemplos de la línea de comandos. En Windows 10/11 ya viene instalado.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="box eye">
+    <span class="label">Ojo</span>
+    <p>No necesitás saber programar para usar API Lab. Sí ayuda tener una idea básica de cómo se abre una terminal. Si nunca la abriste, no te preocupes: el <strong>Paso 1</strong> te enseña.</p>
+  </div>
+</section>
+
+<!-- =========================================================== -->
+<!-- 3. MAPA DEL PROYECTO                                        -->
+<!-- =========================================================== -->
+<section id="mapa">
+  <h2><span class="icon">🗺️</span>Cómo está organizado el proyecto</h2>
+
+  <p>Antes de tocar nada, mirá qué hay adentro de la carpeta. Cada cosa tiene su lugar:</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 700 360" xmlns="http://www.w3.org/2000/svg" style="max-width:660px;">
+      <defs>
+        <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#00d4ff"/>
+        </marker>
+      </defs>
+      <!-- Raíz -->
+      <rect x="270" y="20" width="160" height="44" rx="8" fill="#1a2030" stroke="#00ff9c" stroke-width="2"/>
+      <text x="350" y="48" text-anchor="middle" fill="#00ff9c" font-size="16" font-weight="700">crear-api/</text>
+      <!-- data -->
+      <rect x="40" y="120" width="160" height="70" rx="8" fill="#1a2030" stroke="#00d4ff" stroke-width="2"/>
+      <text x="120" y="146" text-anchor="middle" fill="#00d4ff" font-size="14" font-weight="700">📦 data/</text>
+      <text x="120" y="170" text-anchor="middle" fill="#8b96a8" font-size="11">los datos en JSON</text>
+      <!-- option1 -->
+      <rect x="270" y="120" width="160" height="70" rx="8" fill="#1a2030" stroke="#ff3ec8" stroke-width="2"/>
+      <text x="350" y="146" text-anchor="middle" fill="#ff3ec8" font-size="14" font-weight="700">🌐 option1/</text>
+      <text x="350" y="170" text-anchor="middle" fill="#8b96a8" font-size="11">versión HTML (sin Python)</text>
+      <!-- option2 -->
+      <rect x="500" y="120" width="160" height="70" rx="8" fill="#1a2030" stroke="#ff8c42" stroke-width="2"/>
+      <text x="580" y="146" text-anchor="middle" fill="#ff8c42" font-size="14" font-weight="700">⚙️ option2/</text>
+      <text x="580" y="170" text-anchor="middle" fill="#8b96a8" font-size="11">versión Python (la que usamos)</text>
+      <!-- docs -->
+      <rect x="40" y="240" width="160" height="70" rx="8" fill="#1a2030" stroke="#ffd83d" stroke-width="2"/>
+      <text x="120" y="266" text-anchor="middle" fill="#ffd83d" font-size="14" font-weight="700">📚 docs/</text>
+      <text x="120" y="290" text-anchor="middle" fill="#8b96a8" font-size="11">documentación (¡estás acá!)</text>
+      <!-- archivos sueltos -->
+      <rect x="270" y="240" width="160" height="70" rx="8" fill="#1a2030" stroke="#8b96a8" stroke-width="2"/>
+      <text x="350" y="266" text-anchor="middle" fill="#8b96a8" font-size="14" font-weight="700">📄 README.md</text>
+      <text x="350" y="290" text-anchor="middle" fill="#8b96a8" font-size="11">presentación del proyecto</text>
+      <rect x="500" y="240" width="160" height="70" rx="8" fill="#1a2030" stroke="#8b96a8" stroke-width="2"/>
+      <text x="580" y="266" text-anchor="middle" fill="#8b96a8" font-size="14" font-weight="700">📄 LICENSE</text>
+      <text x="580" y="290" text-anchor="middle" fill="#8b96a8" font-size="11">licencia MIT</text>
+      <!-- flechas desde raíz -->
+      <line x1="350" y1="64" x2="120" y2="120" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#ar2)"/>
+      <line x1="350" y1="64" x2="350" y2="120" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#ar2)"/>
+      <line x1="350" y1="64" x2="580" y2="120" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#ar2)"/>
+      <line x1="300" y1="64" x2="120" y2="240" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#ar2)"/>
+      <line x1="350" y1="64" x2="350" y2="240" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#ar2)"/>
+      <line x1="400" y1="64" x2="580" y2="240" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#ar2)"/>
+    </svg>
+    <div class="caption">Figura 1: estructura de carpetas del proyecto.</div>
+  </div>
+
+  <p>En este manual vamos a usar la <strong style="color:var(--orange)">carpeta option2/</strong> (la versión con Python). Si querés algo más fácil que no necesita instalar nada, mirá <code>option1/api-lab.html</code> que es un solo archivo HTML con todo adentro.</p>
+</section>
+
+<!-- =========================================================== -->
+<!-- PASO 1: ABRIR LA TERMINAL                                   -->
+<!-- =========================================================== -->
+<section id="paso-1">
+  <h2><span class="icon">⌨️</span>Paso a paso</h2>
+
+  <div class="step">
+    <div class="num">1</div>
+    <div class="body">
+      <h3>Abrir la terminal</h3>
+      <p>La "terminal" es una ventanita negra donde escribís comandos en vez de hacer click. Suena viejo, pero es la forma más rápida de hablar con tu computadora.</p>
+
+      <p><strong>En Windows 10 u 11:</strong></p>
+      <ol>
+        <li>Apretá la tecla <strong>Windows</strong> (la del logo, abajo a la izquierda)</li>
+        <li>Escribí <code>cmd</code> o <code>powershell</code></li>
+        <li>Apretá <strong>Enter</strong></li>
+        <li>Listo: tenés una ventanita negra abierta</li>
+      </ol>
+
+      <div class="diagram">
+        <svg viewBox="0 0 600 160" xmlns="http://www.w3.org/2000/svg" style="max-width:560px;">
+          <rect x="40" y="30" width="520" height="110" rx="8" fill="#0d1421" stroke="#00ff9c" stroke-width="2"/>
+          <text x="60" y="58" fill="#8b96a8" font-size="11">Microsoft Windows [Versión 10.0.22631]</text>
+          <text x="60" y="78" fill="#8b96a8" font-size="11">(c) Microsoft Corporation. Todos los derechos reservados.</text>
+          <text x="60" y="110" fill="#00ff9c" font-size="14" font-family="Consolas, monospace">C:\Users\usuario&gt; <tspan fill="#ffffff" id="cur">_</tspan></text>
+          <rect x="183" y="98" width="9" height="16" fill="#00ff9c">
+            <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite"/>
+          </rect>
+        </svg>
+        <div class="caption">Figura 2: así se ve una terminal recién abierta en Windows.</div>
+      </div>
+
+      <div class="box tip">
+        <span class="label">TIP</span>
+        <p>Cuando veas <code>C:\Users\usuario&gt;</code> quiere decir "estás parado en la carpeta de tu usuario". El cursor parpadea esperando que escribas algo. Siempre que veas ese símbolo en este manual, significa "escribí esto en la terminal".</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================== -->
+  <!-- PASO 2: IR A LA CARPETA                                    -->
+  <!-- =========================================================== -->
+  <div class="step">
+    <div class="num">2</div>
+    <div class="body">
+      <h3>Ir a la carpeta del lab</h3>
+      <p>Ahora hay que decirle a la terminal dónde está la carpeta del proyecto. Eso se hace con el comando <code>cd</code> (que significa <em>"change directory"</em>, o sea "cambiar de carpeta").</p>
+
+      <p>Escribí esto y apretá <strong>Enter</strong>:</p>
+
+      <pre><code>cd "C:\Users\usuario\github\Repo por usuarios\AlbertiJ\crear-api\option2"</code></pre>
+
+      <p>Si la ruta tiene espacios (como "Repo por usuarios"), tenés que envolverla con comillas. Si no, la terminal se confunde.</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 600 120" xmlns="http://www.w3.org/2000/svg" style="max-width:560px;">
+          <rect x="40" y="20" width="520" height="80" rx="8" fill="#0d1421" stroke="#00ff9c" stroke-width="2"/>
+          <text x="60" y="50" fill="#00ff9c" font-size="13" font-family="Consolas, monospace">C:\Users\usuario&gt; <tspan fill="#ffffff">cd "C:\Users\usuario\github\Repo por usuarios\AlbertiJ\crear-api\option2"</tspan></text>
+          <text x="60" y="78" fill="#00ff9c" font-size="13" font-family="Consolas, monospace">C:\Users\usuario\github\Repo por usuarios\AlbertiJ\crear-api\option2&gt; <tspan fill="#ffd83d">_</tspan></text>
+        </svg>
+        <div class="caption">Figura 3: el cursor ahora muestra la nueva carpeta.</div>
+      </div>
+
+      <div class="box eye">
+        <span class="label">Cómo saber si funcionó</span>
+        <p>Si a la izquierda del cursor ves la ruta nueva, todo bien. Si te tira un error tipo "El sistema no puede encontrar la ruta especificada", es porque la carpeta no está donde pensás. Abrí el explorador de Windows, navegá hasta la carpeta, y copiá la ruta desde la barra de arriba.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================== -->
+  <!-- PASO 3: INSTALAR FLASK                                     -->
+  <!-- =========================================================== -->
+  <div class="step magenta">
+    <div class="num">3</div>
+    <div class="body">
+      <h3>Instalar Flask (la herramienta que hace andar el server)</h3>
+      <p>Flask es como el "motor" del lab. Sin él, el archivo <code>lab.py</code> no funciona. Se instala con un solo comando:</p>
+
+      <pre><code>pip install flask</code></pre>
+
+      <p>Apretá Enter y esperá unos segundos. Vas a ver un montón de texto bajando, y al final algo como:</p>
+
+      <pre><code>Successfully installed flask-3.1.3 ...</code></pre>
+
+      <div class="box tip">
+        <span class="label">¿Qué es pip?</span>
+        <p>Es como una "tienda de aplicaciones" pero para Python. En vez de descargar cosas a mano, le decís a <code>pip</code> "instalame Flask" y él se encarga.</p>
+      </div>
+
+      <div class="box warn">
+        <span class="label">Si te dice "pip no se reconoce"</span>
+        <p>Probablemente tu Python no agregó pip al PATH. Reinstala Python desde <a href="https://python.org" target="_blank">python.org</a> y <strong>marcá la casilla "Add Python to PATH"</strong> en la primera pantalla del instalador. Es la respuesta al 90% de los problemas de Python en Windows.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================== -->
+  <!-- PASO 4: ARRANCAR EL SERVER                                 -->
+  <!-- =========================================================== -->
+  <div class="step">
+    <div class="num">4</div>
+    <div class="body">
+      <h3>Arrancar el servidor</h3>
+      <p>Ahora sí, la parte divertida. Escribí:</p>
+
+      <pre><code>python lab.py</code></pre>
+
+      <p>Si todo va bien, vas a ver un cartelito así (sin los cuadraditos raros, eso es un problema de fuentes de la terminal que no importa):</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 620 220" xmlns="http://www.w3.org/2000/svg" style="max-width:580px;">
+          <rect x="20" y="20" width="580" height="180" rx="8" fill="#0d1421" stroke="#00ff9c" stroke-width="2"/>
+          <text x="40" y="48" fill="#00ff9c" font-size="13" font-weight="700">╔══════════════════════════════════════════════════════════╗</text>
+          <text x="40" y="68" fill="#00ff9c" font-size="13" font-weight="700">║   API LAB — Pentesting &amp; Linux                          ║</text>
+          <text x="40" y="92" fill="#8b96a8" font-size="12">║   Servidor:  http://127.0.0.1:5050                       ║</text>
+          <text x="40" y="110" fill="#8b96a8" font-size="12">║   Datos:     2 datasets disponibles                      ║</text>
+          <text x="40" y="130" fill="#8b96a8" font-size="12">║   Endpoints clave:                                       ║</text>
+          <text x="40" y="148" fill="#8b96a8" font-size="12">║     GET  /api/v1/help                                     ║</text>
+          <text x="40" y="166" fill="#8b96a8" font-size="12">║     GET  /api/v1/datasets                                 ║</text>
+          <text x="40" y="184" fill="#8b96a8" font-size="12">║     POST /api/v1/datasets/privesc/load                    ║</text>
+        </svg>
+        <div class="caption">Figura 4: el banner que muestra que el server arrancó bien.</div>
+      </div>
+
+      <div class="box tip">
+        <span class="label">Lo importante</span>
+        <p>Si ves la línea <code>Running on http://127.0.0.1:5050</code>, el server está <strong>VIVO</strong>. No cierres la terminal: el server vive adentro. Si la cerrás, se apaga.</p>
+      </div>
+
+      <div class="box warn">
+        <span class="label">Si dice "Address already in use"</span>
+        <p>Significa que otro programa está usando el puerto 5050. Pasá un puerto distinto al final: <code>python lab.py --port 5060</code> (o cualquier número entre 5000 y 9999 que tengas libre).</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================== -->
+  <!-- PASO 5: ABRIR EL NAVEGADOR                                 -->
+  <!-- =========================================================== -->
+  <div class="step">
+    <div class="num">5</div>
+    <div class="body">
+      <h3>Abrir el navegador</h3>
+      <p>El server está corriendo pero "adentro" de la terminal. Para hablar con él, abrí el navegador y andá a:</p>
+
+      <pre><code>http://127.0.0.1:5050</code></pre>
+
+      <p>Vas a ver una página con un menú y un buscador. Esa es la "puerta de entrada" al lab.</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 600 280" xmlns="http://www.w3.org/2000/svg" style="max-width:560px;">
+          <!-- ventana navegador -->
+          <rect x="20" y="20" width="560" height="240" rx="10" fill="#1a2030" stroke="#00d4ff" stroke-width="2"/>
+          <rect x="20" y="20" width="560" height="32" rx="10" fill="#0d1421"/>
+          <circle cx="42" cy="36" r="5" fill="#ff5566"/>
+          <circle cx="58" cy="36" r="5" fill="#ffd83d"/>
+          <circle cx="74" cy="36" r="5" fill="#00ff9c"/>
+          <rect x="100" y="26" width="400" height="20" rx="4" fill="#1a2030" stroke="#2a3548"/>
+          <text x="300" y="40" text-anchor="middle" fill="#8b96a8" font-size="11">http://127.0.0.1:5050</text>
+          <!-- contenido -->
+          <text x="300" y="90" text-anchor="middle" fill="#00ff9c" font-size="22" font-weight="700">API LAB</text>
+          <text x="300" y="115" text-anchor="middle" fill="#8b96a8" font-size="12">Pentesting &amp; Linux</text>
+          <!-- botones -->
+          <rect x="80" y="150" width="160" height="50" rx="8" fill="#111827" stroke="#00ff9c" stroke-width="2"/>
+          <text x="160" y="180" text-anchor="middle" fill="#00ff9c" font-size="14" font-weight="600">📦 Cargar datos</text>
+          <rect x="260" y="150" width="160" height="50" rx="8" fill="#111827" stroke="#00d4ff" stroke-width="2"/>
+          <text x="340" y="180" text-anchor="middle" fill="#00d4ff" font-size="14" font-weight="600">🔍 Buscar</text>
+          <rect x="440" y="150" width="100" height="50" rx="8" fill="#111827" stroke="#ff3ec8" stroke-width="2"/>
+          <text x="490" y="180" text-anchor="middle" fill="#ff3ec8" font-size="14" font-weight="600">📖 Ayuda</text>
+          <text x="300" y="240" text-anchor="middle" fill="#8b96a8" font-size="11">↑ así se ve la página principal del lab ↑</text>
+        </svg>
+        <div class="caption">Figura 5: lo que vas a ver en el navegador.</div>
+      </div>
+
+      <div class="box tip">
+        <span class="label">¿Qué es 127.0.0.1?</span>
+        <p>Es la dirección de <strong>tu propia máquina</strong>. Es como decir "yo mismo". Todas las páginas que empiezan con <code>127.0.0.1</code> viven en tu computadora, no en internet. El <code>5050</code> es el "departamento" dentro de tu máquina donde está el server.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================== -->
+  <!-- PASO 6: CARGAR LOS DATOS                                   -->
+  <!-- =========================================================== -->
+  <div class="step magenta">
+    <div class="num">6</div>
+    <div class="body">
+      <h3>Cargar los datos (¡la parte más importante!)</h3>
+      <p>El lab arranca con la base de datos <strong>vacía</strong>. Los datos existen en archivos JSON, pero no están "conectados" al server hasta que vos los cargues. Es como una biblioteca con libros en la bodega: hay que subirlos al estante para que la gente los pueda leer.</p>
+
+      <p>Hay <strong>dos formas</strong> de cargarlos:</p>
+
+      <h3 style="color:var(--neon-2);">A) Desde el navegador (más fácil)</h3>
+      <ol>
+        <li>Andá a <code>http://127.0.0.1:5050</code></li>
+        <li>Apretá el botón <strong>"Cargar datos"</strong></li>
+        <li>Elegí el dataset (<code>privesc</code> o <code>commands</code>)</li>
+        <li>Listo, ya está cargado</li>
+      </ol>
+
+      <h3 style="color:var(--neon-2);">B) Desde la terminal con curl (más pro)</h3>
+      <p>Abrí <strong>otra ventana de terminal</strong> (sin cerrar la del server) y escribí:</p>
+
+      <pre><code>curl -X POST http://127.0.0.1:5050/api/v1/datasets/privesc/load</code></pre>
+
+      <p>Vas a ver algo así:</p>
+
+      <pre><code>{
+  "loaded_at": "2026-06-17T21:35:43Z",
+  "msg": "Dataset 'privesc' cargado en DB",
+  "total_categories": 11,
+  "total_commands": 87
+}</code></pre>
+
+      <div class="diagram">
+        <svg viewBox="0 0 620 200" xmlns="http://www.w3.org/2000/svg" style="max-width:580px;">
+          <defs>
+            <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#00ff9c"/>
+            </marker>
+            <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#ff3ec8"/>
+            </marker>
+          </defs>
+          <!-- terminal -->
+          <rect x="20" y="30" width="220" height="140" rx="8" fill="#0d1421" stroke="#00ff9c" stroke-width="2"/>
+          <text x="120" y="60" text-anchor="middle" fill="#00ff9c" font-size="14" font-weight="700">Terminal</text>
+          <text x="120" y="100" text-anchor="middle" fill="#ffffff" font-size="11" font-family="Consolas, monospace">curl -X POST</text>
+          <text x="120" y="118" text-anchor="middle" fill="#ffffff" font-size="11" font-family="Consolas, monospace">/api/v1/datasets/</text>
+          <text x="120" y="136" text-anchor="middle" fill="#ffffff" font-size="11" font-family="Consolas, monospace">privesc/load</text>
+          <text x="120" y="156" text-anchor="middle" fill="#8b96a8" font-size="10">↓ mandás una orden</text>
+          <!-- server -->
+          <rect x="380" y="30" width="220" height="140" rx="8" fill="#0d1421" stroke="#ff3ec8" stroke-width="2"/>
+          <text x="490" y="60" text-anchor="middle" fill="#ff3ec8" font-size="14" font-weight="700">API Lab</text>
+          <text x="490" y="100" text-anchor="middle" fill="#ffffff" font-size="11">recibe la orden</text>
+          <text x="490" y="118" text-anchor="middle" fill="#ffffff" font-size="11">abre el archivo</text>
+          <text x="490" y="136" text-anchor="middle" fill="#ffffff" font-size="11">carga los datos</text>
+          <text x="490" y="156" text-anchor="middle" fill="#8b96a8" font-size="10">↑ te contesta</text>
+          <!-- flechas -->
+          <line x1="240" y1="100" x2="378" y2="100" stroke="#00ff9c" stroke-width="2" marker-end="url(#ar3)"/>
+          <line x1="378" y1="130" x2="240" y2="130" stroke="#ff3ec8" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#ar4)"/>
+        </svg>
+        <div class="caption">Figura 6: el flujo de cargar un dataset.</div>
+      </div>
+
+      <div class="box magic">
+        <span class="label">El verbo POST</span>
+        <p>En el mundo de las APIs hay "verbos" para distintas acciones. Los más comunes son <code>GET</code> (pedir datos) y <code>POST</code> (mandar una orden, como "cargar esto"). Por eso en el comando curl va el <code>-X POST</code>: para decirle a curl "esto no es una consulta, es una orden".</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================== -->
+  <!-- PASO 7: EXPLORAR                                           -->
+  <!-- =========================================================== -->
+  <div class="step">
+    <div class="num">7</div>
+    <div class="body">
+      <h3>Explorar y probar cosas</h3>
+      <p>Ya con los datos cargados, podés probar todos los endpoints. Acá van los más útiles:</p>
+
+      <table>
+        <thead>
+          <tr><th>Qué hace</th><th>Comando</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Ver qué hay cargado</td><td><code>curl http://127.0.0.1:5050/api/v1/datasets</code></td></tr>
+          <tr><td>Ver toda la ayuda</td><td><code>curl http://127.0.0.1:5050/api/v1/help</code></td></tr>
+          <tr><td>Buscar comandos "suid"</td><td><code>curl "http://127.0.0.1:5050/api/v1/commands?cat=suid"</code></td></tr>
+          <tr><td>Solo los críticos</td><td><code>curl "http://127.0.0.1:5050/api/v1/commands?severity=critical"</code></td></tr>
+          <tr><td>Buscar por palabra</td><td><code>curl "http://127.0.0.1:5050/api/v1/commands?q=python"</code></td></tr>
+          <tr><td>Ver shells reversos</td><td><code>curl http://127.0.0.1:5050/api/v1/shells</code></td></tr>
+          <tr><td>Comando al azar</td><td><code>curl http://127.0.0.1:5050/api/v1/random</code></td></tr>
+          <tr><td>Búsqueda global</td><td><code>curl "http://127.0.0.1:5050/api/v1/search?q=kernel"</code></td></tr>
+        </tbody>
+      </table>
+
+      <div class="box eye">
+        <span class="label">El símbolo &amp; en URLs</span>
+        <p>Si querés combinar filtros (por ejemplo categoría <em>y</em> severidad), usás <code>&amp;</code> entre ellos. Asegurate de envolver toda la URL con comillas para que la terminal no se confunda.</p>
+      </div>
+
+      <p>Si querés ver el catálogo completo de todos los endpoints con descripciones largas, andá a:</p>
+      <pre><code>http://127.0.0.1:5050/api/v1/help</code></pre>
+      <p>O en formato texto plano (ideal para leer en la terminal):</p>
+      <pre><code>curl http://127.0.0.1:5050/api/v1/help.txt</code></pre>
+    </div>
+  </div>
+
+  <!-- =========================================================== -->
+  <!-- PASO 8: APAGAR                                             -->
+  <!-- =========================================================== -->
+  <div class="step">
+    <div class="num">8</div>
+    <div class="body">
+      <h3>Apagar el servidor (cuando termines)</h3>
+      <p>Andá a la terminal donde está corriendo el server y apretá:</p>
+
+      <pre><code>Ctrl + C</code></pre>
+
+      <p>Eso lo apaga limpiamente. La próxima vez que quieras usarlo, repetí desde el <strong>Paso 4</strong>.</p>
+
+      <div class="box tip">
+        <span class="label">¿Y mis datos?</span>
+        <p>Cuando apagás el server, los datos cargados <strong>se borran</strong> (viven en la memoria RAM, no en el disco). Es parte de la experiencia: cada vez que arranques, arrancás desde cero. Es como un Tetris: nuevo juego, todo vacío.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================== -->
+<!-- PROBLEMAS                                                   -->
+<!-- =========================================================== -->
+<section id="problemas">
+  <h2><span class="icon">🚧</span>Si algo no anda</h2>
+
+  <p>Los problemas más comunes y cómo resolverlos:</p>
+
+  <div class="box warn">
+    <span class="label">"python no se reconoce como comando"</span>
+    <p>Python no está instalado o no está en el PATH. Reinstala desde python.org y <strong>marcá "Add Python to PATH"</strong>.</p>
+  </div>
+
+  <div class="box warn">
+    <span class="label">"pip no se reconoce"</span>
+    <p>Mismo problema: Python no está en el PATH. Solución: reinstalar como dijimos arriba.</p>
+  </div>
+
+  <div class="box warn">
+    <span class="label">"Address already in use" al arrancar</span>
+    <p>El puerto 5050 está ocupado. Probá con otro: <code>python lab.py --port 5060</code></p>
+  </div>
+
+  <div class="box warn">
+    <span class="label">"No module named flask"</span>
+    <p>Te salteaste el Paso 3. Volvé y ejecutá <code>pip install flask</code>.</p>
+  </div>
+
+  <div class="box warn">
+    <span class="label">El navegador dice "No se puede acceder al sitio"</span>
+    <p>El server no está corriendo. Volvé al Paso 4 y verificá que la terminal diga <code>Running on http://127.0.0.1:5050</code>. Si no, la terminal está cerrada o se colgó.</p>
+  </div>
+
+  <div class="box warn">
+    <span class="label">curl dice "no se reconoce"</span>
+    <p>En Windows muy viejos curl no viene. Actualizá Windows o instalá curl desde <a href="https://curl.se" target="_blank">curl.se</a>. En Windows 10/11 ya viene.</p>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Los caracteres chinos/rotos en el banner</span>
+    <p>Es un problema de fuentes de la terminal, no del lab. El server funciona igual. Si te molesta, abrí PowerShell con <code>chcp 65001</code> antes de arrancar.</p>
+  </div>
+</section>
+
+<!-- =========================================================== -->
+<!-- GLOSARIO                                                    -->
+<!-- =========================================================== -->
+<section id="glosario">
+  <h2><span class="icon">📖</span>Glosario rápido</h2>
+
+  <p>Palabras raras que vas a ver seguido, explicadas en castellano básico:</p>
+
+  <div class="glossary">
+    <div class="term"><span class="k">API</span><span class="v">Una forma ordenada de pedirle cosas a un programa. Como un mozo en un restaurante.</span></div>
+    <div class="term"><span class="k">Endpoint</span><span class="v">Una "puerta" de la API. Cada endpoint hace una cosa distinta.</span></div>
+    <div class="term"><span class="k">GET</span><span class="v">"Traeme datos". El verbo más común. Solo lee, no cambia nada.</span></div>
+    <div class="term"><span class="k">POST</span><span class="v">"Hacé esto". Manda una orden al server (cargar, borrar, crear).</span></div>
+    <div class="term"><span class="k">DELETE</span><span class="v">"Borrá esto". Como DELETE en el teclado: borra.</span></div>
+    <div class="term"><span class="k">JSON</span><span class="v">Un formato de texto para guardar datos. Llaves <code>{ }</code> y corchetes <code>[ ]</code> por todos lados.</span></div>
+    <div class="term"><span class="k">Server</span><span class="v">Un programa que se queda esperando que alguien le hable y le contesta.</span></div>
+    <div class="term"><span class="k">Cliente</span><span class="v">El programa que le habla al server. Tu navegador, por ejemplo.</span></div>
+    <div class="term"><span class="k">curl</span><span class="v">Un programa de terminal para hacer pedidos HTTP sin abrir el navegador.</span></div>
+    <div class="term"><span class="k">127.0.0.1</span><span class="v">"Yo mismo" en lenguaje de computadoras. Es tu propia máquina.</span></div>
+    <div class="term"><span class="k">Puerto</span><span class="v">Como un "departamento" dentro de tu máquina. El lab vive en el 5050.</span></div>
+    <div class="term"><span class="k">Dataset</span><span class="v">Una colección de datos. Acá hay dos: <code>privesc</code> y <code>commands</code>.</span></div>
+    <div class="term"><span class="k">Flask</span><span class="v">Una herramienta de Python para hacer servers web fácil.</span></div>
+    <div class="term"><span class="k">Pentesting</span><span class="v">"Penetration testing": probar sistemas para encontrar fallas de seguridad.</span></div>
+    <div class="term"><span class="k">Privesc</span><span class="v">"Privilege escalation": pasar de ser un usuario común a ser administrador.</span></div>
+    <div class="term"><span class="k">Reverse shell</span><span class="v">Una conexión que hace que la máquina víctima se conecte a vos. Útil en pentesting.</span></div>
+  </div>
+</section>
+
+<!-- =========================================================== -->
+<!-- CIERRE                                                      -->
+<!-- =========================================================== -->
+<section>
+  <div class="box magic">
+    <span class="label">¡Listo!</span>
+    <p>Si llegaste hasta acá, ya sabés todo lo que necesitás para usar API Lab. La mejor forma de aprender es romper cosas: probá endpoints al azar, mandá queries raras, mirá qué responde el server. <strong>Lo peor que puede pasar es que se caiga el server y vuelvas a arrancar.</strong></p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="big">🔐</div>
+  <div>API Lab · Manual para principiantes · v 1.1.0</div>
+  <div style="margin-top:8px;">Hecho con fines educativos. Aprendé, practicá, sé ético.</div>
+</footer>
+
+</body>
+</html>

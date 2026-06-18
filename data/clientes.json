@@ -1,0 +1,134 @@
+{
+  "name": "Clientes (Test DB)",
+  "description": "DB de prueba con campos de cliente y 5 items aleatorios. Para testear consumo de APIs y manejo de campos heterogéneos (algunos nulos, algunos arrays, booleanos opuestos).",
+  "schema": {
+    "id": "int    (autoincremental)",
+    "ID": "string (identificador externo, ej. UUID o código de país)",
+    "nombres": "string (uno o más nombres)",
+    "apellidos": "string (uno o más apellidos)",
+    "DOC. tipo": "string (DNI, PAS, LE, LC)",
+    "DNI": "string (8 dígitos) o None si no tiene",
+    "CUIT": "string (formato XX-XXXXXXXX-X)",
+    "Registro civil": "string (código de registro civil) o None",
+    "Domicilio": "string (dirección principal)",
+    "Domicilios": "list   (array de strings con todas las direcciones)",
+    "Test1": "any    (campo de test, el tipo puede variar)",
+    "Test2": "any    (campo de test, el tipo puede variar)",
+    "Registro conducir": "string (categoría + número) o None si no tiene registro",
+    "tipo de sangre": "string (A+, A-, B+, B-, AB+, AB-, O+, O-)",
+    "creditos": "number (puede ser negativo, según deuda o saldo)",
+    "apto": "bool   (True/False)",
+    "no apto": "bool   (True/False — generalmente opuesto a 'apto')"
+  },
+  "items": [
+    {
+      "id": 1,
+      "ID": "AR-2024-0001",
+      "nombres": "María Fernanda",
+      "apellidos": "González Pérez",
+      "DOC. tipo": "DNI",
+      "DNI": "28456789",
+      "CUIT": "27-28456789-4",
+      "Registro civil": "RC-001234",
+      "Domicilio": "Av. Corrientes 1234, CABA",
+      "Domicilios": [
+        "Av. Corrientes 1234, CABA",
+        "Calle 60 nro 456, La Plata"
+      ],
+      "Test1": true,
+      "Test2": null,
+      "Registro conducir": "B1-123456",
+      "tipo de sangre": "A+",
+      "creditos": 1500,
+      "apto": true,
+      "no apto": false
+    },
+    {
+      "id": 2,
+      "ID": "AR-2024-0002",
+      "nombres": "Juan Carlos",
+      "apellidos": "Pérez Rodríguez",
+      "DOC. tipo": "DNI",
+      "DNI": "32145678",
+      "CUIT": "20-32145678-9",
+      "Registro civil": "RC-001235",
+      "Domicilio": "Calle 50 nro 678, La Plata",
+      "Domicilios": [
+        "Calle 50 nro 678, La Plata"
+      ],
+      "Test1": false,
+      "Test2": "valor X",
+      "Registro conducir": "B2-234567",
+      "tipo de sangre": "O-",
+      "creditos": 0,
+      "apto": false,
+      "no apto": true
+    },
+    {
+      "id": 3,
+      "ID": "AR-2024-0003",
+      "nombres": "Ana Lucía",
+      "apellidos": "Martínez López",
+      "DOC. tipo": "PAS",
+      "DNI": null,
+      "CUIT": "23-35678901-4",
+      "Registro civil": "RC-001236",
+      "Domicilio": "Av. Rivadavia 5432, CABA",
+      "Domicilios": [
+        "Av. Rivadavia 5432, CABA",
+        "Belgrano 234, Quilmes"
+      ],
+      "Test1": null,
+      "Test2": null,
+      "Registro conducir": "A1-345678",
+      "tipo de sangre": "B+",
+      "creditos": 750,
+      "apto": true,
+      "no apto": false
+    },
+    {
+      "id": 4,
+      "ID": "AR-2024-0004",
+      "nombres": "Luis Alberto",
+      "apellidos": "Fernández Suárez",
+      "DOC. tipo": "DNI",
+      "DNI": "40123456",
+      "CUIT": "20-40123456-3",
+      "Registro civil": "RC-001237",
+      "Domicilio": "San Martín 890, Mar del Plata",
+      "Domicilios": [
+        "San Martín 890, Mar del Plata"
+      ],
+      "Test1": true,
+      "Test2": 42,
+      "Registro conducir": null,
+      "tipo de sangre": "AB+",
+      "creditos": 3200,
+      "apto": true,
+      "no apto": false
+    },
+    {
+      "id": 5,
+      "ID": "AR-2024-0005",
+      "nombres": "Sofía Inés",
+      "apellidos": "Sánchez Castro",
+      "DOC. tipo": "DNI",
+      "DNI": "45789123",
+      "CUIT": "27-45789123-8",
+      "Registro civil": "RC-001238",
+      "Domicilio": "Mitre 234, Lanús",
+      "Domicilios": [
+        "Mitre 234, Lanús",
+        "Av. San Martín 1100, Lanús",
+        "Casa quinta en Mar del Plata"
+      ],
+      "Test1": false,
+      "Test2": "pendiente",
+      "Registro conducir": "B1-456789",
+      "tipo de sangre": "O+",
+      "creditos": -150,
+      "apto": false,
+      "no apto": true
+    }
+  ]
+}
