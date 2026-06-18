@@ -164,14 +164,19 @@
     display: flex;
     border-top: 1px solid var(--border);
     background: var(--bg-elev);
+    min-width: 0;        /* permitir que el flex-item se encoja */
+    overflow: hidden;    /* nada se sale del ancho del container */
   }
   .console-input .prompt {
-    padding: 12px 12px 12px 16px;
+    flex-shrink: 0;
+    padding: 12px 8px 12px 16px;
     color: var(--accent);
     font-size: 13px;
   }
   .console-input input {
     flex: 1;
+    min-width: 0;        /* CRÍTICO: sin esto el input se expande y deforma */
+    width: 0;            /* refuerza lo anterior */
     background: transparent;
     border: none;
     outline: none;
@@ -179,8 +184,19 @@
     font-family: inherit;
     font-size: 13px;
     padding: 12px 16px 12px 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .console-input input::placeholder { color: var(--text-dim); }
+
+  /* Evitar que los <pre> de las respuestas deformen el layout */
+  .console-output pre {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
 
   /* CONTENT */
   .content {
@@ -590,7 +606,8 @@ const DATASETS = {
    ============================================================ */
 const DB = {
   loaded: {},  // { datasetKey: { meta, categories, shells, ... } }
-  queries: []  // log
+  queries: [], // log
+  started_at: new Date().toISOString()
 };
 
 const MOCK_API = {
@@ -696,10 +713,176 @@ const MOCK_API = {
         { method: "GET",    path: "/api/v1/shells",                 desc: "Lista reverse shells" },
         { method: "GET",    path: "/api/v1/db",                     desc: "Estado de la DB" },
         { method: "DELETE", path: "/api/v1/db",                     desc: "Vacía la DB" },
-        { method: "GET",    path: "/api/v1/help",                   desc: "Esta ayuda" }
+        { method: "GET",    path: "/api/v1/help",                   desc: "Esta ayuda" },
+        // ---- v1.1.0 ----
+        { method: "GET",    path: "/api/v1/discovery",              desc: "Info disclosure inicial del lab" },
+        { method: "GET",    path: "/api/v1/fingerprint",            desc: "Fingerprint del server" },
+        { method: "GET",    path: "/api/v1/routes",                 desc: "Mapa de todas las rutas" },
+        { method: "GET",    path: "/api/v1/health",                 desc: "Health check" },
+        { method: "GET",    path: "/api/v1/severities",             desc: "Severidades con conteo" },
+        { method: "GET",    path: "/api/v1/categories",             desc: "Categorías cross-dataset" },
+        { method: "GET",    path: "/api/v1/schemas/:name",          desc: "Schema/estructura de un dataset" },
+        { method: "GET",    path: "/api/v1/search",                 desc: "Búsqueda full-text (?q=)" },
+        { method: "GET",    path: "/api/v1/random",                 desc: "Comando aleatorio" }
       ]
     }
-  })
+  }),
+
+  // ---- Endpoints de discovery (v1.1.0) ----
+
+  // GET /api/v1/discovery
+  'GET /api/v1/discovery': () => ({
+    status: 200,
+    data: {
+      lab: "API Lab — Pentesting & Linux",
+      version: "1.1.0",
+      api_root: "/api/v1",
+      mode: "standalone (HTML mock)",
+      datasets_available: Object.keys(DATASETS),
+      datasets_loaded: Object.keys(DB.loaded),
+      endpoints_count: Object.keys(MOCK_API).length,
+      started_at: DB.started_at
+    }
+  }),
+
+  // GET /api/v1/fingerprint
+  'GET /api/v1/fingerprint': () => ({
+    status: 200,
+    data: {
+      server: "Mock (browser JS)",
+      framework: "Vanilla JS",
+      framework_version: navigator.userAgent,
+      content_type: "application/json",
+      encoding: "utf-8",
+      cors: false,
+      auth_required: false,
+      rate_limit: false,
+      debug_mode: false
+    }
+  }),
+
+  // GET /api/v1/routes
+  'GET /api/v1/routes': () => {
+    const routes = Object.keys(MOCK_API).map(h => {
+      const m = h.match(/^(\S+)\s+(\S+)$/);
+      return { rule: m[2], methods: [m[1]], endpoint: h };
+    });
+    return { status: 200, data: { count: routes.length, routes } };
+  },
+
+  // GET /api/v1/health
+  'GET /api/v1/health': () => ({
+    status: 200,
+    data: {
+      status: "ok",
+      uptime_since: DB.started_at,
+      datasets_available: Object.keys(DATASETS).length,
+      datasets_loaded: Object.keys(DB.loaded).length,
+      ts: new Date().toISOString()
+    }
+  }),
+
+  // GET /api/v1/severities
+  'GET /api/v1/severities': () => {
+    const loadedKeys = Object.keys(DB.loaded);
+    if (loadedKeys.length === 0) {
+      return { status: 503, data: { error: "DB vacía. Cargá un dataset primero: POST /api/v1/datasets/privesc/load" } };
+    }
+    const sev = {};
+    loadedKeys.forEach(k => {
+      Object.values(DB.loaded[k].categories || {}).forEach(c => {
+        const s = c.severity || "unknown";
+        sev[s] = (sev[s] || 0) + (c.commands || []).length;
+      });
+    });
+    return { status: 200, data: { count: Object.keys(sev).length, severities: sev } };
+  },
+
+  // GET /api/v1/categories
+  'GET /api/v1/categories': () => {
+    const loadedKeys = Object.keys(DB.loaded);
+    if (loadedKeys.length === 0) {
+      return { status: 503, data: { error: "DB vacía. Cargá un dataset primero: POST /api/v1/datasets/privesc/load" } };
+    }
+    const items = [];
+    loadedKeys.forEach(k => {
+      Object.entries(DB.loaded[k].categories || {}).forEach(([catKey, cat]) => {
+        items.push({ dataset: k, key: catKey, title: cat.title, severity: cat.severity, commands: (cat.commands || []).length });
+      });
+    });
+    return { status: 200, data: { count: items.length, categories: items } };
+  },
+
+  // GET /api/v1/schemas/:name
+  'GET /api/v1/schemas/': (params) => {
+    const name = params[0];
+    if (!name || !DATASETS[name]) return { status: 404, data: { error: `Dataset '${name}' no existe`, available: Object.keys(DATASETS) } };
+    const ds = DATASETS[name];
+    const cats = ds.categories || {};
+    const sampleCat = Object.values(cats)[0];
+    const sampleCmd = sampleCat && sampleCat.commands && sampleCat.commands[0];
+    return {
+      status: 200,
+      data: {
+        name: ds.name,
+        description: ds.description,
+        categories: Object.keys(cats),
+        commands_count: Object.values(cats).reduce((s, c) => s + (c.commands || []).length, 0),
+        categories_count: Object.keys(cats).length,
+        shells_keys: Object.keys(ds.shells || {}),
+        sample_command: sampleCmd || null
+      }
+    };
+  },
+
+  // GET /api/v1/search?q=...
+  'GET /api/v1/search': (params, query) => {
+    const loadedKeys = Object.keys(DB.loaded);
+    if (loadedKeys.length === 0) {
+      return { status: 503, data: { error: "DB vacía. Cargá un dataset primero: POST /api/v1/datasets/privesc/load" } };
+    }
+    const q = (query.q || "").toLowerCase().trim();
+    if (!q) return { status: 400, data: { error: "Parámetro 'q' requerido", example: "/api/v1/search?q=python" } };
+    const limit = parseInt(query.limit || 50);
+    const results = [];
+    loadedKeys.forEach(k => {
+      const ds = DB.loaded[k];
+      Object.entries(ds.categories || {}).forEach(([catKey, cat]) => {
+        (cat.commands || []).forEach((cmd, idx) => {
+          if ((cmd.cmd || "").toLowerCase().includes(q) || (cmd.desc || "").toLowerCase().includes(q)) {
+            results.push({ type: "command", id: `${k}/${catKey}/${idx}`, dataset: k, category: catKey, severity: cat.severity, cmd: cmd.cmd, desc: cmd.desc });
+          }
+        });
+      });
+      Object.entries(ds.shells || {}).forEach(([shellId, shell]) => {
+        const haystack = `${shellId} ${shell.syntax || ""} ${shell.desc || ""}`.toLowerCase();
+        if (haystack.includes(q)) {
+          results.push({ type: "shell", id: shellId, dataset: k, payload: shell.syntax, desc: shell.desc });
+        }
+      });
+    });
+    return { status: 200, data: { q, count: results.length, returned: Math.min(limit, results.length), results: results.slice(0, limit) } };
+  },
+
+  // GET /api/v1/random
+  'GET /api/v1/random': (params, query) => {
+    const loadedKeys = Object.keys(DB.loaded);
+    if (loadedKeys.length === 0) {
+      return { status: 503, data: { error: "DB vacía. Cargá un dataset primero: POST /api/v1/datasets/privesc/load" } };
+    }
+    const pool = [];
+    loadedKeys.forEach(k => {
+      if (query.dataset && query.dataset !== k) return;
+      Object.entries(DB.loaded[k].categories || {}).forEach(([catKey, cat]) => {
+        if (query.severity && cat.severity !== query.severity) return;
+        (cat.commands || []).forEach((cmd, idx) => {
+          pool.push({ id: `${k}/${catKey}/${idx}`, dataset: k, category: catKey, category_title: cat.title, severity: cat.severity, cmd: cmd.cmd, desc: cmd.desc });
+        });
+      });
+    });
+    if (pool.length === 0) return { status: 404, data: { error: "Sin resultados con esos filtros" } };
+    return { status: 200, data: pool[Math.floor(Math.random() * pool.length)] };
+  }
 };
 
 /* ============================================================
@@ -716,31 +899,46 @@ function parseCommand(input) {
 
 function matchRoute(method, path) {
   // path estilo /api/v1/datasets/privesc/load -> split por /
+  // segs para "/api/v1/help"              = ["api", "v1", "help"]                (length 3)
+  // segs para "/api/v1/datasets"          = ["api", "v1", "datasets"]            (length 3)
+  // segs para "/api/v1/datasets/privesc"  = ["api", "v1", "datasets", "privesc"] (length 4)
+  // segs para "/api/v1/datasets/privesc/load" = ["api","v1","datasets","privesc","load"] (length 5)
   const segs = path.split("/").filter(Boolean);
   if (segs[0] !== "api" || segs[1] !== "v1") return null;
 
   // /api/v1/help
-  if (segs.length === 2 && segs[2] === "help") return { handler: 'GET /api/v1/help', params: [], query: {} };
+  if (segs.length === 3 && segs[2] === "help") return { handler: 'GET /api/v1/help', params: [], query: {} };
 
   // /api/v1/db
-  if (segs.length === 2 && segs[2] === "db") return { handler: `${method} /api/v1/db`, params: [], query: {} };
+  if (segs.length === 3 && segs[2] === "db") return { handler: `${method} /api/v1/db`, params: [], query: {} };
 
   // /api/v1/datasets
-  if (segs.length === 2 && segs[2] === "datasets") return { handler: 'GET /api/v1/datasets', params: [], query: {} };
+  if (segs.length === 3 && segs[2] === "datasets") return { handler: 'GET /api/v1/datasets', params: [], query: {} };
 
-  // /api/v1/datasets/:name
-  if (segs.length === 3 && segs[2] === "datasets") return { handler: 'GET /api/v1/datasets/', params: [segs[3]], query: {} };
+  // /api/v1/datasets/:name  (4 segmentos)
+  if (segs.length === 4 && segs[2] === "datasets") return { handler: 'GET /api/v1/datasets/', params: [segs[3]], query: {} };
 
-  // /api/v1/datasets/:name/load
-  if (segs.length === 4 && segs[2] === "datasets" && segs[4] === "load") {
+  // /api/v1/datasets/:name/load  (5 segmentos, antes era 4 — ese era el bug)
+  if (segs.length === 5 && segs[2] === "datasets" && segs[4] === "load") {
     return { handler: 'POST /api/v1/datasets/', params: [segs[3], "load"], query: {} };
   }
 
   // /api/v1/commands
-  if (segs.length === 2 && segs[2] === "commands") return { handler: 'GET /api/v1/commands', params: [], query: {} };
+  if (segs.length === 3 && segs[2] === "commands") return { handler: 'GET /api/v1/commands', params: [], query: {} };
 
   // /api/v1/shells
-  if (segs.length === 2 && segs[2] === "shells") return { handler: 'GET /api/v1/shells', params: [], query: {} };
+  if (segs.length === 3 && segs[2] === "shells") return { handler: 'GET /api/v1/shells', params: [], query: {} };
+
+  // ---- Endpoints de discovery (v1.1.0) ----
+  if (segs.length === 3 && segs[2] === "discovery")      return { handler: 'GET /api/v1/discovery', params: [], query: {} };
+  if (segs.length === 3 && segs[2] === "fingerprint")    return { handler: 'GET /api/v1/fingerprint', params: [], query: {} };
+  if (segs.length === 3 && segs[2] === "routes")         return { handler: 'GET /api/v1/routes', params: [], query: {} };
+  if (segs.length === 3 && segs[2] === "health")         return { handler: 'GET /api/v1/health', params: [], query: {} };
+  if (segs.length === 3 && segs[2] === "severities")     return { handler: 'GET /api/v1/severities', params: [], query: {} };
+  if (segs.length === 3 && segs[2] === "categories")     return { handler: 'GET /api/v1/categories', params: [], query: {} };
+  if (segs.length === 3 && segs[2] === "search")         return { handler: 'GET /api/v1/search', params: [], query: {} };
+  if (segs.length === 3 && segs[2] === "random")         return { handler: 'GET /api/v1/random', params: [], query: {} };
+  if (segs.length === 4 && segs[2] === "schemas")        return { handler: 'GET /api/v1/schemas/', params: [segs[3]], query: {} };
 
   return null;
 }
@@ -798,16 +996,31 @@ function updateDBStats() {
   const stats = $("#dbStats");
   const loaded = Object.keys(DB.loaded);
   if (loaded.length === 0) {
-    stats.innerHTML = `<div class="db-empty">// DB vacía</div>`;
+    stats.innerHTML = `<div class="db-empty">// DB vacía</div>
+      <div style="margin-top:8px;font-size:11px;color:var(--text-dim)">
+        Probá:<br>
+        <code style="color:var(--accent)">POST /api/v1/datasets/privesc/load</code>
+      </div>`;
     return;
   }
   const totalCmds = Object.values(DB.loaded).reduce((s,ds) => s + Object.values(ds.categories||{}).reduce((a,c)=>a+(c.commands||[]).length,0), 0);
   const totalCats = Object.values(DB.loaded).reduce((s,ds)=>s+Object.keys(ds.categories||{}).length,0);
+  // lista de categorías con conteo
+  const catList = [];
+  loaded.forEach(k => {
+    Object.entries(DB.loaded[k].categories || {}).forEach(([catKey, cat]) => {
+      catList.push(`<div class="db-row" style="padding-left:8px"><span>└ ${catKey}</span><span>${(cat.commands||[]).length}</span></div>`);
+    });
+  });
   stats.innerHTML = `
     <div class="db-row"><span>Datasets:</span><span>${loaded.length}</span></div>
     <div class="db-row"><span>Categorías:</span><span>${totalCats}</span></div>
     <div class="db-row"><span>Comandos:</span><span>${totalCmds}</span></div>
     <div class="db-row"><span>Queries:</span><span>${DB.queries.length}</span></div>
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase">Categorías</div>
+      ${catList.join("")}
+    </div>
   `;
 }
 
@@ -927,6 +1140,17 @@ document.addEventListener("DOMContentLoaded", () => {
     tab.addEventListener("click", () => {
       $$(".tab").forEach(t => t.classList.remove("active"));
       tab.classList.add("active");
+      // cada tab hace algo concreto:
+      if (tab.dataset.tab === "console") {
+        // Consola API: scroll a la consola y focus al input
+        const consoleEl = $(".console");
+        if (consoleEl) consoleEl.scrollIntoView({ behavior: "smooth", block: "end" });
+        setTimeout(() => $("#cmd").focus(), 200);
+      } else if (tab.dataset.tab === "content") {
+        // Vista: scroll al panel de contenido
+        const viewEl = $("#view");
+        if (viewEl) viewEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     });
   });
 
@@ -935,8 +1159,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Enter") {
       const v = $("#cmd").value.trim();
       if (!v) return;
+      // Borrar el input ANTES de procesar (por si executeCommand hace foco a otro lado)
       $("#cmd").value = "";
       executeCommand(v);
+      // Devolver el foco al input para que la próxima escritura siga ahí
+      $("#cmd").focus();
     }
   });
 
