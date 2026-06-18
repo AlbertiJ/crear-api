@@ -37,6 +37,24 @@ DOCS_DIR = BASE_DIR.parent / "docs"
 app = Flask(__name__, static_folder=None)
 app.config["JSON_SORT_KEYS"] = False
 
+# ---------------------------------------------------------------------
+# CORS — para que option2/static_index.html (abierto desde file:// o
+# desde otro origen) pueda hacer fetch al Flask. Sin esto, el browser
+# bloquea todas las requests por same-origin policy.
+# ---------------------------------------------------------------------
+@app.after_request
+def add_cors_headers(resp):
+    resp.headers["Access-Control-Allow-Origin"]  = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    resp.headers["Access-Control-Max-Age"]      = "3600"
+    return resp
+
+@app.route("/<path:_any>", methods=["OPTIONS"])
+def cors_preflight(_any):
+    """Responde 200 a cualquier preflight CORS (OPTIONS)."""
+    return jsonify({}), 200
+
 # DB en memoria (se puede cambiar a SQLite si querés persistencia)
 DB = {
     "loaded": {},        # { "privesc": {...}, "commands": {...} }
@@ -58,6 +76,7 @@ def load_dataset_file(filename):
 DATASETS = {
     "privesc":    load_dataset_file("privesc.json"),
     "commands":   load_dataset_file("commands.json"),
+    "clientes":   load_dataset_file("clientes.json"),
 }
 
 # ---------------------------------------------------------------------
@@ -207,7 +226,30 @@ def count_categories(ds):
 # ---------------------------------------------------------------------
 @app.route("/")
 def index():
+    """Página principal: home con los 3 botones (Cargar / Consola / Ayuda)."""
+    return send_from_directory(BASE_DIR, "home.html")
+
+@app.route("/consola")
+def consola():
+    """La consola de comandos (antes era la página principal)."""
     return send_from_directory(BASE_DIR, "static_index.html")
+
+@app.route("/cargar")
+def cargar_page():
+    """Página para cargar datasets con botones (POST visual)."""
+    return send_from_directory(BASE_DIR, "cargar.html")
+
+@app.route("/standalone")
+@app.route("/option1")
+def standalone_page():
+    """Sirve la opción 1 (standalone HTML) directamente desde el Flask,
+    así se puede acceder a http://host:port/standalone sin abrir file://.
+    El archivo option1/api-lab.html también sigue siendo standalone
+    (se puede abrir con doble click y funciona solo)."""
+    opt1 = BASE_DIR.parent / "option1" / "api-lab.html"
+    if not opt1.exists():
+        return jsonify({"error": "option1/api-lab.html no encontrado"}), 404
+    return send_from_directory(str(opt1.parent), opt1.name)
 
 @app.route("/api/v1/help")
 def help():
@@ -691,6 +733,120 @@ def random_command():
     if not pool:
         return jsonify({"error": "Sin resultados con esos filtros"}), 404
     return jsonify(random.choice(pool))
+
+# ---------------------------------------------------------------------
+# CLIENTES — endpoints dedicados para data/clientes.json
+#   Este dataset tiene un formato distinto (schema + items, no categories).
+#   Los endpoints leen el archivo directamente del disco, no necesitan
+#   "load" en memoria. La estructura es plana por item.
+# ---------------------------------------------------------------------
+def _load_clientes():
+    """Lee data/clientes.json del disco. Devuelve el dict o None si no existe."""
+    path = DATA_DIR / "clientes.json"
+    if not path.exists():
+        return None
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def _cliente_to_dict(item):
+    """Normaliza un item de clientes para output."""
+    return {
+        "id":            item.get("id"),
+        "ID":            item.get("ID"),
+        "nombres":       item.get("nombres"),
+        "apellidos":     item.get("apellidos"),
+        "DOC. tipo":     item.get("DOC. tipo"),
+        "DNI":           item.get("DNI"),
+        "CUIT":          item.get("CUIT"),
+        "Registro civil":item.get("Registro civil"),
+        "Domicilio":     item.get("Domicilio"),
+        "Domicilios":    item.get("Domicilios"),
+        "Test1":         item.get("Test1"),
+        "Test2":         item.get("Test2"),
+        "Registro conducir": item.get("Registro conducir"),
+        "tipo de sangre":item.get("tipo de sangre"),
+        "creditos":      item.get("creditos"),
+        "apto":          item.get("apto"),
+        "no apto":       item.get("no apto"),
+    }
+
+@app.route("/api/v1/clientes", methods=["GET"])
+def list_clientes():
+    """Lista todos los clientes. Soporta ?limit=, ?offset=, ?apto=true|false."""
+    log_query("GET", "/api/v1/clientes")
+    data = _load_clientes()
+    if data is None:
+        return jsonify({"error": "data/clientes.json no existe"}), 404
+    items = data.get("items", [])
+    # filtros
+    apto = request.args.get("apto")
+    if apto is not None:
+        if apto.lower() == "true":
+            items = [c for c in items if c.get("apto") is True]
+        elif apto.lower() == "false":
+            items = [c for c in items if c.get("apto") is False]
+    try:
+        limit = int(request.args.get("limit", 100))
+    except ValueError:
+        limit = 100
+    try:
+        offset = int(request.args.get("offset", 0))
+    except ValueError:
+        offset = 0
+    total = len(items)
+    page = items[offset:offset + limit]
+    return jsonify({
+        "name": data.get("name"),
+        "description": data.get("description"),
+        "schema": data.get("schema"),
+        "count": total,
+        "returned": len(page),
+        "offset": offset,
+        "limit": limit,
+        "items": [_cliente_to_dict(c) for c in page]
+    })
+
+@app.route("/api/v1/clientes/<int:cli_id>", methods=["GET"])
+def get_cliente(cli_id):
+    """Detalle de un cliente por su id numérico."""
+    log_query("GET", f"/api/v1/clientes/{cli_id}")
+    data = _load_clientes()
+    if data is None:
+        return jsonify({"error": "data/clientes.json no existe"}), 404
+    for c in data.get("items", []):
+        if c.get("id") == cli_id:
+            return jsonify(_cliente_to_dict(c))
+    return jsonify({"error": f"Cliente con id={cli_id} no encontrado", "available_ids": [c.get("id") for c in data.get("items", [])]}), 404
+
+@app.route("/api/v1/clientes/search", methods=["GET"])
+def search_clientes():
+    """Búsqueda full-text sobre los campos string de los clientes."""
+    log_query("GET", "/api/v1/clientes/search")
+    data = _load_clientes()
+    if data is None:
+        return jsonify({"error": "data/clientes.json no existe"}), 404
+    q = request.args.get("q", "").lower().strip()
+    if not q:
+        return jsonify({"error": "Parámetro 'q' requerido", "example": "/api/v1/clientes/search?q=alberto"}), 400
+    campos_str = ["ID", "nombres", "apellidos", "DOC. tipo", "DNI", "CUIT",
+                  "Registro civil", "Domicilio", "Registro conducir", "tipo de sangre"]
+    resultados = []
+    for c in data.get("items", []):
+        for campo in campos_str:
+            val = c.get(campo)
+            if val and q in str(val).lower():
+                resultados.append(_cliente_to_dict(c))
+                break
+        else:
+            # también buscar en el array de domicilios
+            doms = c.get("Domicilios") or []
+            if any(q in str(d).lower() for d in doms):
+                resultados.append(_cliente_to_dict(c))
+    return jsonify({
+        "q": q,
+        "count": len(resultados),
+        "results": resultados
+    })
 
 # ---------------------------------------------------------------------
 # STATIC

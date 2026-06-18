@@ -49,18 +49,29 @@
   .endpoint .verb { color: #4d9fff; font-weight: bold; }
   .endpoint .path { color: #00ff9d; }
   .endpoint .desc { color: #6b7785; margin-left: 8px; }
+  /* Selector de host (cuando se abre desde file://) */
+  .host-row { margin-top:8px; display:flex; gap:8px; align-items:center; font-size:12px; }
+  .host-row label { color:#6b7785; }
+  .host-row input { width:260px; padding:6px 10px; font-size:12px; }
+  .host-row button { font-size:11px; padding:5px 10px; }
 </style>
 </head>
 <body>
 <div class="container">
   <header>
-    <h1>⚡ API Lab — Python Backend</h1>
+    <h1>⚡ API Lab — Python Backend · <a href="/" style="color:#00ff9d;font-size:13px;text-decoration:none;border:1px solid #00ff9d;padding:2px 8px;border-radius:4px;">← Inicio</a></h1>
     <p style="color:#6b7785;margin-top:6px;font-size:12px">Conectado al servidor Flask en <span id="apiBase"></span></p>
     <p style="margin-top:6px"><span class="pill" id="statusPill">● checking...</span></p>
+    <div class="host-row">
+      <label for="apiBase">Flask server:</label>
+      <input type="text" id="apiBase" placeholder="http://127.0.0.1:5050">
+      <button onclick="saveHost()">Guardar</button>
+      <span id="hostNote" style="color:#6b7785"></span>
+    </div>
     <p style="margin-top:10px;font-size:12px;">
-      <a href="/manual" target="_blank" style="color:#00ff9d;text-decoration:none;border:1px solid #00ff9d;padding:4px 10px;border-radius:4px;margin-right:6px;">📖 Manual para principiantes</a>
-      <a href="/api/v1/help" target="_blank" style="color:#4d9fff;text-decoration:none;border:1px solid #4d9fff;padding:4px 10px;border-radius:4px;margin-right:6px;">🔧 Help (JSON)</a>
-      <a href="/api/v1/help.txt" target="_blank" style="color:#4d9fff;text-decoration:none;border:1px solid #4d9fff;padding:4px 10px;border-radius:4px;">📄 Help (texto plano)</a>
+      <a id="linkManual" href="#" target="_blank" style="color:#00ff9d;text-decoration:none;border:1px solid #00ff9d;padding:4px 10px;border-radius:4px;margin-right:6px;">📖 Manual para principiantes</a>
+      <a id="linkHelp" href="#" target="_blank" style="color:#4d9fff;text-decoration:none;border:1px solid #4d9fff;padding:4px 10px;border-radius:4px;margin-right:6px;">🔧 Help (JSON)</a>
+      <a id="linkHelpTxt" href="#" target="_blank" style="color:#4d9fff;text-decoration:none;border:1px solid #4d9fff;padding:4px 10px;border-radius:4px;">📄 Help (texto plano)</a>
     </p>
   </header>
 
@@ -105,10 +116,57 @@
 </div>
 
 <script>
-const API = "";  // mismo host
-const $ = s => document.querySelector(s);
+/* ============================================================
+   HOST — autodetección + persistencia + editable
+   - Si el HTML se abre desde http(s)://   → usa location.origin
+   - Si se abre desde file://              → usa el último host
+                                              guardado o
+                                              http://127.0.0.1:5050
+   ============================================================ */
+const DEFAULT_HOST = "http://127.0.0.1:5050";
+const LS_KEY = "apiLab.host";
 
-document.getElementById("apiBase").textContent = location.origin;
+function detectHost() {
+  // Caso 1: el HTML está servido por el mismo Flask (caso ideal)
+  if (location.protocol === "http:" || location.protocol === "https:") {
+    return location.origin;
+  }
+  // Caso 2: file:// — usar el host guardado o el default
+  try {
+    const saved = localStorage.getItem(LS_KEY);
+    if (saved) return saved;
+  } catch (e) { /* localStorage puede estar deshabilitado */ }
+  return DEFAULT_HOST;
+}
+
+let API = detectHost();
+
+function setApiHost(newHost) {
+  // guardar el host que el usuario tipeó
+  newHost = newHost.trim().replace(/\/+$/, "");  // sacar trailing slash
+  if (!newHost) return;
+  if (!/^https?:\/\//.test(newHost)) newHost = "http://" + newHost;
+  API = newHost;
+  try { localStorage.setItem(LS_KEY, API); } catch (e) {}
+  updateLinks();
+  $("#apiBase").value = API;
+  $("#hostNote").textContent = "✓ guardado";
+  setTimeout(() => { $("#hostNote").textContent = ""; }, 1500);
+  // Refrescar todo
+  loadEndpoints();
+  refreshStats();
+  checkStatus();
+}
+
+window.saveHost = setApiHost;
+
+function updateLinks() {
+  $("#linkManual").href = API + "/manual";
+  $("#linkHelp").href   = API + "/api/v1/help";
+  $("#linkHelpTxt").href= API + "/api/v1/help.txt";
+}
+
+const $ = s => document.querySelector(s);
 
 function append(html, cls = "info") {
   const out = $("#output");
@@ -119,6 +177,20 @@ function append(html, cls = "info") {
   out.scrollTop = out.scrollHeight;
 }
 
+async function checkStatus() {
+  try {
+    const r = await fetch(API + "/api/v1/health", { cache: "no-store" });
+    if (r.ok) {
+      $("#statusPill").textContent = "● connected";
+      $("#statusPill").classList.remove("off");
+      return true;
+    }
+  } catch (e) { /* fall through */ }
+  $("#statusPill").textContent = "● disconnected";
+  $("#statusPill").classList.add("off");
+  return false;
+}
+
 async function run(input) {
   input = (input || $("#cmd").value).trim();
   if (!input) return;
@@ -127,34 +199,48 @@ async function run(input) {
   let method, path;
   if (m) { method = m[1].toUpperCase(); path = m[2]; }
   else if (input.startsWith("/")) { method = "GET"; path = input; }
-  else { append(`✗ Sintaxis inválida: ${input}`, "err"); return; }
+  else { append(`✗ Sintaxis inválida: ${input}. Usá: <code>GET /api/v1/help</code>`, "err"); return; }
 
   append(`→ <b style="color:#4d9fff">${method}</b> ${path}`, "req");
   try {
     const r = await fetch(API + path, { method });
-    const data = await r.json();
+    const ct = r.headers.get("content-type") || "";
+    let data, pretty;
+    if (ct.includes("application/json")) {
+      data = await r.json();
+      pretty = JSON.stringify(data, null, 2);
+    } else {
+      pretty = await r.text();
+    }
     const cls = r.ok ? "res" : "err";
-    append(`← <b>${r.status}</b> ${method} ${path.split("?")[0]}<br><pre>${JSON.stringify(data, null, 2)}</pre>`, cls);
+    append(`← <b>${r.status}</b> ${method} ${path.split("?")[0]}<br><pre>${escapeHtml(pretty)}</pre>`, cls);
+    if (r.ok) checkStatus();
     refreshStats();
   } catch (e) {
-    append(`✗ Error de red: ${e.message}<br><span style="color:#6b7785">¿Está corriendo el servidor Flask? Probá <code>python lab.py</code></span>`, "err");
+    append(`✗ Error de red: ${escapeHtml(e.message)}<br><span style="color:#6b7785">¿Está corriendo el servidor Flask en <code>${API}</code>? Probá <code>python lab.py</code></span>`, "err");
     $("#statusPill").textContent = "● disconnected";
     $("#statusPill").classList.add("off");
   }
 }
 
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 async function refreshStats() {
   try {
-    const r = await fetch(API + "/api/v1/db");
+    const r = await fetch(API + "/api/v1/db", { cache: "no-store" });
+    if (!r.ok) return;
     const d = await r.json();
-    $("#sLoaded").textContent = d.loaded_datasets.length;
-    $("#sCmds").textContent = d.total_commands;
-    $("#sCats").textContent = d.total_categories;
-    $("#sQueries").textContent = d.queries_count;
-    if (d.loaded_datasets.length > 0) {
-      $("#statusPill").textContent = "● connected";
-      $("#statusPill").classList.remove("off");
-    }
+    $("#sLoaded").textContent = d.loaded_datasets ? d.loaded_datasets.length : 0;
+    $("#sCmds").textContent = d.total_commands || 0;
+    $("#sCats").textContent = d.total_categories || 0;
+    $("#sQueries").textContent = d.queries_count || 0;
   } catch (e) { /* ignore */ }
 }
 
@@ -162,19 +248,38 @@ async function loadEndpoints() {
   try {
     const r = await fetch(API + "/api/v1/help");
     const d = await r.json();
-    $("#endpointsList").innerHTML = d.endpoints.map(e =>
-      `<div class="endpoint"><span class="verb">${e.method}</span> <span class="path">${e.path}</span><span class="desc">— ${e.desc}</span></div>`
-    ).join("");
+    // la nueva estructura devuelve "categorias" (dict) o "endpoints" (array)
+    let list = [];
+    if (Array.isArray(d.endpoints)) {
+      list = d.endpoints;
+    } else if (d.categorias) {
+      Object.entries(d.categorias).forEach(([cat, eps]) => {
+        eps.forEach(e => list.push({ method: e.method, path: e.path, desc: e.short }));
+      });
+    }
+    $("#endpointsList").innerHTML = list.map(e =>
+      `<div class="endpoint"><span class="verb">${e.method}</span> <span class="path">${e.path}</span><span class="desc">— ${e.desc || ""}</span></div>`
+    ).join("") || `<div class="line info">// sin endpoints listados</div>`;
   } catch (e) {
-    $("#endpointsList").innerHTML = `<div class="line err">No se pudo conectar. Iniciá el servidor: <code>python lab.py</code></div>`;
+    $("#endpointsList").innerHTML = `<div class="line err">No se pudo conectar a <code>${API}</code>. Iniciá el servidor: <code>python lab.py</code></div>`;
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Setear el input con el host actual
+  $("#apiBase").value = API;
+  // Enter en el input del host → guardar
+  $("#apiBase").addEventListener("keydown", e => { if (e.key === "Enter") setApiHost($("#apiBase").value); });
+  // Links del header
+  updateLinks();
+  // Consola
   $("#cmd").addEventListener("keydown", e => { if (e.key === "Enter") run(); });
+  // Inicial
   loadEndpoints();
   refreshStats();
-  setInterval(refreshStats, 5000);
+  checkStatus();
+  // Loop de status
+  setInterval(() => { checkStatus(); refreshStats(); }, 5000);
 });
 </script>
 </body>
