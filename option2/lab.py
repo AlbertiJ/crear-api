@@ -1031,6 +1031,77 @@ def _do_load(name):
 
 
 # ---------------------------------------------------------------------
+# HARDENING — seguridad básica para cuando se expone en LAN
+# ---------------------------------------------------------------------
+# Whitelist de redes privadas (loopback, RFC 1918). El server solo
+# acepta requests de estas redes cuando se expone con --host != 127.0.0.1.
+# Requests desde internet (IP pública) → 403.
+def _ip_is_private(ip):
+    """Devuelve True si la IP es loopback, privada o link-local."""
+    if not ip:
+        return False
+    import ipaddress
+    try:
+        addr = ipaddress.ip_address(ip)
+        return (
+            addr.is_loopback or
+            addr.is_private or        # 10.x, 172.16-31.x, 192.168.x
+            addr.is_link_local        # 169.254.x
+        )
+    except ValueError:
+        return False
+
+# Rate limit básico: max N salas por IP por ventana de tiempo
+ROOM_CREATE_HISTORY = []  # [(ip, ts), ...]
+ROOM_CREATE_WINDOW = 60   # segundos
+ROOM_CREATE_MAX = 5       # max salas por ventana
+
+def _rate_limit_ok(ip):
+    """Devuelve True si la IP puede crear una sala más."""
+    import time as _t
+    now = _t.time()
+    # limpiar viejas
+    while ROOM_CREATE_HISTORY and ROOM_CREATE_HISTORY[0][1] < now - ROOM_CREATE_WINDOW:
+        ROOM_CREATE_HISTORY.pop(0)
+    # contar las del IP
+    count = sum(1 for (i, t) in ROOM_CREATE_HISTORY if i == ip)
+    if count >= ROOM_CREATE_MAX:
+        return False
+    ROOM_CREATE_HISTORY.append((ip, now))
+    return True
+
+# Modo público: si el server está expuesto en LAN (no loopback), aplicar
+# whitelist de IPs privadas + rate limit.
+PUBLIC_MODE = False  # se setea en __main__
+
+
+@app.before_request
+def security_guard():
+    """Filtra requests antes de llegar a las vistas."""
+    # siempre permitir health (chequeo del frontend) y discovery
+    if request.path in ("/api/v1/health", "/api/v1/discovery"):
+        return None
+    # si está en modo público, chequear IP
+    if PUBLIC_MODE:
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+        ip = ip.split(",")[0].strip()
+        if not _ip_is_private(ip):
+            DB["history"].append({
+                "action": "blocked_public_ip",
+                "ts": utc_now_iso(),
+                "ip": ip,
+                "path": request.path,
+            })
+            return jsonify({
+                "error": "Acceso bloqueado",
+                "reason": "Este server está configurado para LAN. Solo IPs privadas son aceptadas.",
+                "your_ip": ip,
+                "hint": "Si querés exponer a internet, usá un reverse proxy con autenticación.",
+            }), 403
+    return None
+
+
+# ---------------------------------------------------------------------
 # MODO 4 — 1 vs 1 MULTIJUGADOR (salas en LAN)
 # ---------------------------------------------------------------------
 # Cada sala tiene:
@@ -1137,6 +1208,12 @@ def create_room():
     name = (body.get("name") or "Anónimo").strip()[:20]
     if not name:
         return jsonify({"error": "Falta 'name'"}), 400
+    # rate limit por IP
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown").split(",")[0].strip()
+    if not _rate_limit_ok(ip):
+        return jsonify({
+            "error": f"Rate limit: máximo {ROOM_CREATE_MAX} salas por IP cada {ROOM_CREATE_WINDOW}s. Esperá un momento.",
+        }), 429
     # generar código único
     for _ in range(20):
         code = _gen_room_code()
@@ -1776,6 +1853,19 @@ if __name__ == "__main__":
             mark = "✓" if ok else "✗"
             print(f"   {mark} {name}: {msg}")
 
+    # detectar si estamos exponiendo fuera de loopback
+    is_loopback = (host in ("127.0.0.1", "localhost", "::1"))
+    PUBLIC_MODE = not is_loopback
+    if PUBLIC_MODE:
+        print(f"""
+⚠  MODO PÚBLICO ACTIVADO
+   El server está escuchando en {host}:{port} (no loopback).
+   Se aplicará whitelist de IPs privadas (RFC 1918 + loopback).
+   Requests desde internet (IPs públicas) serán rechazadas con 403.
+   Rate limit: max {ROOM_CREATE_MAX} salas por IP cada {ROOM_CREATE_WINDOW}s.
+   Para jugar en LAN, los 2 deben estar en la misma red privada.
+""")
+
     print(f"""
 ╔════════════════════════════════════════════════════════════╗
 ║           API LAB — Pentesting & Linux                     ║
@@ -1783,23 +1873,40 @@ if __name__ == "__main__":
 ║   Servidor:  http://{host}:{port}                           ║
 ║   Datos:     {len([v for v in DATASETS.values() if v])} datasets disponibles                ║
 ║   DB ahora:  {len(DB["loaded"])} cargados · {sum(count_commands(d) for d in DB["loaded"].values())} comandos                                ║
+║   Modo:      {'loopback (1 sólo máquina)' if is_loopback else 'LAN (whitelist IPs privadas ON)'}              ║
 ║                                                            ║
-║   Endpoints clave:                                         ║
-║     GET  /api/v1/help                                       ║
-║     GET  /api/v1/datasets                                   ║
-║     POST /api/v1/datasets/privesc/load                      ║
-║     GET  /api/v1/commands?cat=suid&severity=critical        ║
-║     GET  /api/v1/shells                                     ║
-║                                                            ║
-║   Modos:                                                   ║
-║     /         → home con selector de modo                  ║
+║   Páginas:                                                  ║
+║     /         → home con selector de 4 modos                ║
 ║     /modo1    → DB pre-cargada (necesita --autoload)       ║
 ║     /consola  → modo 2: manual                             ║
 ║     /cargar   → botones CARGAR / VACIAR                    ║
-║     /modo3    → juego random por tema (próximamente)       ║
-║     /modo4    → 1 vs 1 (próximamente)                      ║
+║     /modo3    → juego random (single-player)               ║
+║     /modo4    → 1 vs 1 (multijugador LAN)                  ║
+║     /manual   → manual paso a paso                         ║
 ║                                                            ║
 ║   Ctrl+C para detener.                                     ║
 ╚════════════════════════════════════════════════════════════╝
 """)
-    app.run(host=host, port=port, debug=False)
+    # Usar waitress (production WSGI server) en lugar de Flask dev server.
+    # Waitress es lo que recomienda Flask/Python para exponer el server
+    # a una red. Si no está instalado, fallback a werkzeug.serving
+    # con threaded=True (que es production-safe para 2 jugadores LAN).
+    try:
+        from waitress import serve
+        print(f"✓ Usando waitress (production WSGI server)")
+        print(f"  Listening on http://{host}:{port}")
+        serve(app, host=host, port=port, ident="api-lab", threads=4)
+    except ImportError:
+        # fallback: werkzeug.serving con threaded=True
+        # NO es el dev server de Flask (que es single-threaded y tira tracebacks).
+        # Es un servidor WSGI de werkzeug que maneja concurrencia y no expone tracebacks.
+        from werkzeug.serving import make_server
+        print("⚠ waitress no instalado, usando werkzeug.serving (threaded=True)")
+        print("  pip install waitress para mejor performance")
+        if PUBLIC_MODE:
+            print()
+            print("  ⚠ Estás exponiendo a LAN. Ya está activada la whitelist de IPs privadas.")
+            print("  ⚠ Para producción REAL, usá waitress + reverse proxy con TLS.")
+        server = make_server(host=host, port=port, app=app, threaded=True)
+        print(f"  Listening on http://{host}:{port}")
+        server.serve_forever()

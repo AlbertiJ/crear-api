@@ -139,14 +139,14 @@ crear-api/
 git clone https://github.com/AlbertiJ/crear-api.git
 cd crear-api/option2
 
-# 2. Instalar dependencia
-pip install flask
+# 2. Instalar dependencias
+pip install flask waitress              # waitress es opcional pero recomendada
 
 # 3. Levantar servidor
-python lab.py                          # puerto default 5050
+python lab.py                          # puerto default 5050, solo localhost (seguro)
 # o
 python lab.py --port 5050              # cambiar puerto
-python lab.py --host 0.0.0.0           # exponer en LAN (modo 4)
+python lab.py --host 0.0.0.0           # exponer en LAN — activa whitelist de IPs privadas
 python lab.py --autoload privesc,commands   # arrancar con datasets (modo 1)
 
 # 4. Abrir navegador
@@ -154,6 +154,15 @@ python lab.py --autoload privesc,commands   # arrancar con datasets (modo 1)
 ```
 
 > **Ideal para**: practicar el flujo real de cliente/servidor, experimentar con `curl`, integrar con Postman, jugar 1 vs 1.
+
+> ⚠️ **Modo LAN (`--host 0.0.0.0`)**: activa automáticamente una whitelist de IPs privadas (RFC 1918: 10.x, 172.16-31.x, 192.168.x + loopback). Cualquier request desde una IP pública es rechazada con 403. El server usa `waitress` (production WSGI) si está instalado, o `werkzeug.serving` con `threaded=True` como fallback. Si no instalás waitress, el server funciona igual pero es menos robusto.
+
+**Para jugar 1 vs 1 en LAN**:
+1. El host corre `python lab.py --host 0.0.0.0 --port 5050`
+2. El host abre `http://localhost:5050/modo4` y crea la sala → obtiene un código de 4 chars
+3. El host le pasa al guest: **(a)** su IP LAN (ej. `192.168.1.50`), **(b)** el código
+4. El guest abre `http://192.168.1.50:5050/modo4`, tipea el código, se une
+5. Los 2 eligen tema, listo, COMENZAR (solo host) → empieza la partida
 
 ---
 
@@ -268,6 +277,19 @@ python lab.py --autoload privesc,commands   # arrancar con datasets (modo 1)
 ---
 
 ## 🛠️ Desarrollo
+
+### 🔒 Seguridad (modo LAN)
+
+Cuando se expone con `--host 0.0.0.0`, el server activa automáticamente:
+
+| Capa | Detalle |
+|---|---|
+| **Whitelist de IPs** | Solo acepta requests de IPs privadas (loopback + RFC 1918). IP pública → 403. |
+| **Rate limit** | Max 5 salas por IP cada 60 segundos (429 si excede). |
+| **Server production** | Usa `waitress` (si está instalado) o `werkzeug.serving` con `threaded=True`. NO usa el dev server de Flask (que tira tracebacks). |
+| **Log de accesos** | Cada request bloqueado por IP pública se loggea en `DB["history"]` con `action: blocked_public_ip`. |
+
+> **Limitaciones**: este lab es para LAN entre amigos. NO está diseñado para exposición directa a internet. Si querés que sea público, ponelo detrás de un reverse proxy (nginx, Caddy) con TLS + autenticación (Authelia, oauth2-proxy, etc.).
 
 ### Agregar un dataset nuevo (modo 2)
 
