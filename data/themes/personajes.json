@@ -1,0 +1,17 @@
+{
+  "name": "Personajes",
+  "icon": "🦸",
+  "description": "Personajes icónicos de literatura, cine y TV",
+  "items": [
+    {"id": "per_001", "nombre": "Harry Potter",      "obra": "Harry Potter",            "tipo": "Mago",         "creador": "J.K. Rowling"},
+    {"id": "per_002", "nombre": "Sherlock Holmes",   "obra": "Sherlock Holmes",         "tipo": "Detective",    "creador": "Arthur Conan Doyle"},
+    {"id": "per_003", "nombre": "Darth Vader",       "obra": "Star Wars",               "tipo": "Sith",         "creador": "George Lucas"},
+    {"id": "per_004", "nombre": "Walter White",      "obra": "Breaking Bad",            "tipo": "Químico",      "creador": "Vince Gilligan"},
+    {"id": "per_005", "nombre": "Tony Soprano",      "obra": "Los Soprano",             "tipo": "Mafioso",      "creador": "David Chase"},
+    {"id": "per_006", "nombre": "Goku",              "obra": "Dragon Ball",             "tipo": "Saiyajin",     "creador": "Akira Toriyama"},
+    {"id": "per_007", "nombre": "Sheldon Cooper",    "obra": "The Big Bang Theory",     "tipo": "Físico",       "creador": "Chuck Lorre"},
+    {"id": "per_008", "nombre": "Lisbeth Salander",  "obra": "Millenium",               "tipo": "Hacker",       "creador": "Stieg Larsson"},
+    {"id": "per_009", "nombre": "Tyrion Lannister",  "obra": "Game of Thrones",         "tipo": "Político",     "creador": "George R.R. Martin"},
+    {"id": "per_010", "nombre": "Eleven",            "obra": "Stranger Things",         "tipo": "Telequinética","creador": "Duffer Brothers"}
+  ]
+}

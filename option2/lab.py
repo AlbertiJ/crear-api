@@ -64,6 +64,19 @@ DB = {
 }
 
 # ---------------------------------------------------------------------
+# ESTADO DEL JUEGO (modos 3 y 4)
+# ---------------------------------------------------------------------
+#   None             → no hay juego activo (modo 1 / 2 normal)
+#   {"mode": 3|4,
+#    "themes": [...],          # temas seleccionados
+#    "total_items": int,       # cantidad total de items en juego
+#    "item_ids": set(),        # todos los IDs que deberían descubrirse
+#    "started_at": iso,
+#    "ends_at":   iso}         # deadline (1h en modo 4)
+GAME = None
+DISCOVERED = set()  # IDs que ya descubrió el jugador
+
+# ---------------------------------------------------------------------
 # CARGA DE DATASETS
 # ---------------------------------------------------------------------
 def load_dataset_file(filename):
@@ -78,6 +91,23 @@ DATASETS = {
     "commands":   load_dataset_file("commands.json"),
     "clientes":   load_dataset_file("clientes.json"),
 }
+
+# ---------------------------------------------------------------------
+# TEMAS — datasets seed para modo 3 (juego random)
+# ---------------------------------------------------------------------
+# Cada theme = { name, icon, description, items: [ {id, ...}, ... ] }
+# Los items se cargan en memoria pero NO se exponen como 'datasets'
+# hasta que el jugador elija temas y arme la mezcla (modo 3).
+THEMES = {}
+for _theme_file in ["musica.json", "peliculas.json", "personajes.json"]:
+    _data = load_dataset_file("themes/" + _theme_file)
+    if _data:
+        _key = _theme_file.replace(".json", "")  # "musica", "peliculas", "personajes"
+        THEMES[_key] = _data
+
+# Mapeo de theme_id → "categoría" que verá el jugador en /api/v1/commands?cat=
+# (musica → "musica", peliculas → "peliculas", etc)
+THEME_CATEGORY = {t: t for t in THEMES}
 
 # ---------------------------------------------------------------------
 # CATÁLOGO DE ENDPOINTS — fuente única para /api/v1/help y /help.txt
@@ -420,14 +450,24 @@ def list_commands():
             if severity and cat_data.get("severity") != severity:
                 continue
             for idx, cmd in enumerate(cat_data.get("commands", [])):
-                if q and (q not in cmd.get("cmd", "").lower() and q not in cmd.get("desc", "").lower()):
-                    continue
+                # q matchea contra cmd, desc Y _search (todos los campos del item de tema)
+                if q:
+                    haystack = (
+                        cmd.get("cmd", "") + " " +
+                        cmd.get("desc", "") + " " +
+                        cmd.get("_search", "")
+                    ).lower()
+                    if q not in haystack:
+                        continue
+                # id real si existe (temas), sino fallback por índice
+                cmd_id = cmd.get("id") or f"{ds_name}/{cat_key}/{idx}"
                 results.append({
-                    "id": f"{ds_name}/{cat_key}/{idx}",
+                    "id": cmd_id,
                     "dataset": ds_name,
                     "category": cat_key,
                     "category_title": cat_data.get("title"),
                     "severity": cat_data.get("severity"),
+                    "theme": cat_data.get("theme"),
                     "cmd": cmd.get("cmd"),
                     "desc": cmd.get("desc")
                 })
@@ -441,28 +481,49 @@ def list_commands():
 @app.route("/api/v1/commands/<path:cmd_id>")
 def get_command(cmd_id):
     log_query("GET", f"/api/v1/commands/{cmd_id}")
-    parts = cmd_id.split("/")
-    if len(parts) != 3:
-        return jsonify({"error": "ID inválido. Formato: dataset/category/index"}), 400
-    ds_name, cat_key, idx_str = parts
-    try:
-        idx = int(idx_str)
-    except ValueError:
-        return jsonify({"error": "Index debe ser numérico"}), 400
-    if ds_name not in DB["loaded"]:
-        return jsonify({"error": f"Dataset '{ds_name}' no cargado"}), 404
-    cat = DB["loaded"][ds_name].get("categories", {}).get(cat_key)
-    if not cat:
-        return jsonify({"error": f"Categoría '{cat_key}' no existe"}), 404
-    if idx < 0 or idx >= len(cat.get("commands", [])):
-        return jsonify({"error": f"Index {idx} fuera de rango"}), 404
-    return jsonify({
-        "id": cmd_id,
-        "dataset": ds_name,
-        "category": cat_key,
-        "severity": cat.get("severity"),
-        **cat["commands"][idx]
-    })
+    # Soporta dos formatos:
+    #   A) "mus_001" / "pel_002" — id real de un tema (modo 3)
+    #   B) "privesc/suid/3"     — formato viejo dataset/cat/index (modo 2)
+    if "/" in cmd_id:
+        parts = cmd_id.split("/")
+        if len(parts) != 3:
+            return jsonify({"error": "ID inválido. Formato: dataset/category/index"}), 400
+        ds_name, cat_key, idx_str = parts
+        try:
+            idx = int(idx_str)
+        except ValueError:
+            return jsonify({"error": "Index debe ser numérico"}), 400
+        if ds_name not in DB["loaded"]:
+            return jsonify({"error": f"Dataset '{ds_name}' no cargado"}), 404
+        cat = DB["loaded"][ds_name].get("categories", {}).get(cat_key)
+        if not cat:
+            return jsonify({"error": f"Categoría '{cat_key}' no existe"}), 404
+        if idx < 0 or idx >= len(cat.get("commands", [])):
+            return jsonify({"error": f"Index {idx} fuera de rango"}), 404
+        return jsonify({
+            "id": cmd_id,
+            "dataset": ds_name,
+            "category": cat_key,
+            "severity": cat.get("severity"),
+            **cat["commands"][idx]
+        })
+    # formato A — id de tema (mus_001, pel_002, etc.)
+    for ds_name, ds in DB["loaded"].items():
+        for cat_key, cat in (ds.get("categories") or {}).items():
+            for cmd in cat.get("commands", []):
+                if cmd.get("id") == cmd_id:
+                    return jsonify({
+                        "id": cmd_id,
+                        "dataset": ds_name,
+                        "category": cat_key,
+                        "category_title": cat.get("title"),
+                        "severity": cat.get("severity"),
+                        "theme": cat.get("theme"),
+                        "cmd": cmd.get("cmd"),
+                        "desc": cmd.get("desc"),
+                        "raw": cmd.get("_raw"),
+                    })
+    return jsonify({"error": f"Item '{cmd_id}' no encontrado"}), 404
 
 @app.route("/api/v1/shells", methods=["GET"])
 def list_shells():
@@ -692,13 +753,21 @@ def global_search():
     for ds_name, ds in DB["loaded"].items():
         for cat_key, cat_data in (ds.get("categories") or {}).items():
             for idx, cmd in enumerate(cat_data.get("commands", [])):
-                if q in cmd.get("cmd", "").lower() or q in cmd.get("desc", "").lower():
+                haystack = (
+                    cmd.get("cmd", "") + " " +
+                    cmd.get("desc", "") + " " +
+                    cmd.get("_search", "")
+                ).lower()
+                if q in haystack:
+                    cmd_id = cmd.get("id") or f"{ds_name}/{cat_key}/{idx}"
                     results.append({
                         "type": "command",
-                        "id": f"{ds_name}/{cat_key}/{idx}",
+                        "id": cmd_id,
                         "dataset": ds_name,
                         "category": cat_key,
+                        "category_title": cat_data.get("title"),
                         "severity": cat_data.get("severity"),
+                        "theme": cat_data.get("theme"),
                         "cmd": cmd.get("cmd"),
                         "desc": cmd.get("desc")
                     })
@@ -881,6 +950,336 @@ def _do_load(name):
     DB["loaded"][name] = payload
     DB["history"].append({"action": "load", "dataset": name, "ts": payload["loaded_at"], "source": "autoload"})
     return True, f"cargado ({count_commands(payload)} comandos)"
+
+
+# ---------------------------------------------------------------------
+# MODO 3 — JUEGO RANDOM POR TEMAS
+# ---------------------------------------------------------------------
+# Estructura de un item de tema (de /themes/musica.json, etc.):
+#   { id, artista, cancion, album, año, genero }
+#   { id, titulo, director, año, genero, pais }
+#   { id, nombre, obra, tipo, creador }
+#
+# Para que funcione con los endpoints existentes (/commands, /commands/<id>,
+# /commands?cat=X, /commands?q=...) mapeamos cada item a la forma
+# { id, cmd, desc, _theme, _search } que es lo que espera /commands.
+#
+# - cmd   = "nombre principal" del item (artista, titulo, nombre, etc.)
+# - desc  = "metadata secundaria" (resto de los campos)
+# - cat   = nombre del tema (musica, peliculas, etc.) — para ?cat=musica
+# - _search = concat de TODOS los campos, para búsqueda full-text
+def _theme_item_to_cmd(item, theme_id):
+    # Campos que son "nombre principal" según el tipo de tema
+    main_keys = {
+        "musica":     ["artista", "cancion"],
+        "peliculas":  ["titulo", "director"],
+        "personajes": ["nombre", "obra"],
+        "bandas":     ["nombre", "origen"],
+        "series":     ["nombre", "plataforma"],
+        "paises":     ["nombre", "capital"],
+    }
+    ks = main_keys.get(theme_id, ["nombre", "titulo"])
+    # armar el cmd
+    parts = []
+    for k in ks:
+        v = item.get(k)
+        if v: parts.append(str(v))
+    cmd = " — ".join(parts) if parts else item.get("id", "?")
+    # armar el desc (todo lo que no sea id ni main_keys)
+    desc_parts = []
+    skip = set(ks + ["id"])
+    for k, v in item.items():
+        if k not in skip and v not in (None, ""):
+            desc_parts.append(f"{k}: {v}")
+    desc = " · ".join(desc_parts)
+    # texto completo para búsqueda
+    search_text = " ".join(str(v) for v in item.values() if v)
+    return {
+        "id":      item["id"],
+        "cmd":     cmd,
+        "desc":    desc,
+        "cat":     theme_id,
+        "_theme":  theme_id,
+        "_search": search_text,
+        "_raw":    item,
+    }
+
+
+@app.route("/api/v1/themes", methods=["GET"])
+def list_themes():
+    """Lista los temas disponibles para modo 3 con conteo de items en el pool."""
+    log_query("GET", "/api/v1/themes")
+    out = []
+    for tid, t in THEMES.items():
+        out.append({
+            "id": tid,
+            "name": t.get("name", tid),
+            "icon": t.get("icon", ""),
+            "description": t.get("description", ""),
+            "pool_size": len(t.get("items", [])),
+        })
+    return jsonify({
+        "themes": out,
+        "total": len(out),
+    })
+
+
+@app.route("/api/v1/themes/<theme_id>/random", methods=["POST"])
+def theme_random_single(theme_id):
+    """Modo 3 single-tema: agarra N items random del pool del tema y los carga."""
+    log_query("POST", f"/api/v1/themes/{theme_id}/random")
+    if theme_id not in THEMES:
+        return jsonify({"error": f"Tema '{theme_id}' no existe", "available": list(THEMES.keys())}), 404
+    body = request.get_json(silent=True) or {}
+    count = int(body.get("count", 5))
+    count = max(1, min(count, len(THEMES[theme_id]["items"])))
+    return _start_game_mode_3([theme_id], count)
+
+
+@app.route("/api/v1/themes/random", methods=["POST"])
+def theme_random_multi():
+    """Modo 3 multi-tema: agarra items random de varios temas y los mezcla."""
+    log_query("POST", "/api/v1/themes/random")
+    body = request.get_json(silent=True) or {}
+    themes = body.get("themes", [])
+    total = int(body.get("total", 12))
+    if not themes:
+        return jsonify({"error": "Falta 'themes' (lista de temas a mezclar)"}), 400
+    bad = [t for t in themes if t not in THEMES]
+    if bad:
+        return jsonify({"error": f"Temas no válidos: {bad}", "available": list(THEMES.keys())}), 400
+    return _start_game_mode_3(themes, total)
+
+
+def _start_game_mode_3(themes, total):
+    """Lógica común: arma la mezcla random, la carga como dataset 'themes' en DB,
+    marca GAME = mode 3, resetea DISCOVERED."""
+    import random as _r
+    _r.seed()  # random real
+
+    pool = []  # (theme_id, item)
+    for tid in themes:
+        for item in THEMES[tid]["items"]:
+            pool.append((tid, item))
+    # shuffle y tomar N
+    _r.shuffle(pool)
+    chosen = pool[:total]
+    # si quieren más items que el pool, repetir/recortar
+    if not chosen:
+        return jsonify({"error": "Pool vacío"}), 400
+
+    # armar estructura tipo dataset
+    cats = {}
+    item_ids = set()
+    for tid, item in chosen:
+        cmd_obj = _theme_item_to_cmd(item, tid)
+        item_ids.add(cmd_obj["id"])
+        # categoría con el nombre del tema (sin prefijo) para que ?cat=musica matchee
+        cat_key = tid
+        cats.setdefault(cat_key, {
+            "title": THEMES[tid]["name"],
+            "severity": "info",
+            "theme": tid,
+            "commands": [],
+        })
+        cats[cat_key]["commands"].append(cmd_obj)
+
+    payload = {
+        "name": "themes",
+        "description": f"Juego random — {', '.join(themes)}",
+        "categories": cats,
+        "themes_active": themes,
+        "loaded_at": utc_now_iso(),
+    }
+
+    # limpiar DB previa y meter la nueva
+    DB["loaded"] = {}
+    DB["loaded"]["themes"] = payload
+    DB["history"].append({
+        "action": "load",
+        "dataset": "themes",
+        "ts": payload["loaded_at"],
+        "source": "mode3",
+        "themes": themes,
+        "total_items": len(chosen),
+    })
+
+    # activar juego
+    global GAME, DISCOVERED
+    DISCOVERED = set()
+    GAME = {
+        "mode": 3,
+        "themes": list(themes),
+        "total_items": len(chosen),
+        "item_ids": item_ids,
+        "started_at": utc_now_iso(),
+        "ends_at": None,  # modo 3 no tiene timer
+    }
+    return jsonify({
+        "msg": f"Juego modo 3 armado",
+        "mode": 3,
+        "themes": list(themes),
+        "total_items": len(chosen),
+        "rules": {
+            "blocked_endpoints": ["/api/v1/db", "/api/v1/datasets", "/api/v1/datasets/<name>", "/api/v1/shells", "/api/v1/random", "/api/v1/categories", "/api/v1/severities"],
+            "allowed_endpoints": ["/api/v1/help", "/api/v1/health", "/api/v1/discovery", "/api/v1/commands?cat=X", "/api/v1/commands/<id>", "/api/v1/commands?q=X", "/api/v1/search?q=X"],
+        },
+        "hint": "Empezá con GET /api/v1/commands?cat=<tema> para filtrar por tema, o probá /api/v1/search?q=<palabra>",
+    }), 201
+
+
+@app.route("/api/v1/game/state", methods=["GET"])
+def game_state():
+    """Estado del juego activo (modo 3 o 4)."""
+    log_query("GET", "/api/v1/game/state")
+    if GAME is None:
+        return jsonify({"active": False, "mode": None})
+    discovered = list(DISCOVERED)
+    total = len(GAME["item_ids"])
+    found = sum(1 for x in GAME["item_ids"] if x in DISCOVERED)
+    return jsonify({
+        "active": True,
+        "mode": GAME["mode"],
+        "themes": GAME["themes"],
+        "total": total,
+        "discovered": discovered,
+        "found": found,
+        "remaining": total - found,
+        "started_at": GAME["started_at"],
+        "ends_at": GAME.get("ends_at"),
+        "finished": found >= total,
+    })
+
+
+@app.route("/api/v1/game/abandon", methods=["POST"])
+def game_abandon():
+    """Abandonar el juego activo."""
+    log_query("POST", "/api/v1/game/abandon")
+    global GAME, DISCOVERED
+    if GAME is None:
+        return jsonify({"error": "No hay juego activo"}), 404
+    found = sum(1 for x in GAME["item_ids"] if x in DISCOVERED)
+    total = len(GAME["item_ids"])
+    summary = {
+        "mode": GAME["mode"],
+        "found": found,
+        "total": total,
+        "themes": GAME["themes"],
+        "discovered_ids": list(DISCOVERED),
+    }
+    GAME = None
+    DISCOVERED = set()
+    # vaciar la DB del juego
+    if "themes" in DB["loaded"]:
+        del DB["loaded"]["themes"]
+    return jsonify({"msg": "Juego abandonado", "summary": summary})
+
+
+# ---------------------------------------------------------------------
+# FILTRO DE TRAMPA — endpoints bloqueados en modo 3 y 4
+# ---------------------------------------------------------------------
+# Un endpoint está "trampa" cuando revela el contenido completo o
+# permite filtrar sin restricción. En modo 3 / 4 devolvemos 403 con
+# un mensaje claro.
+TRAMPA_ENDPOINTS = (
+    "/api/v1/db",
+    "/api/v1/shells",
+    "/api/v1/random",
+    "/api/v1/categories",
+    "/api/v1/severities",
+)
+
+@app.before_request
+def trap_guard():
+    """Bloquea endpoints trampa en modo 3/4. También bloquea
+    /api/v1/commands sin filtros (sin ?cat=, ?q=, ?severity=)."""
+    if GAME is None:
+        return None  # modo libre, no bloquear nada
+    path = request.path
+    method = request.method
+    if method != "GET":
+        return None
+    # endpoints trampa totales
+    for trampa in TRAMPA_ENDPOINTS:
+        if path == trampa:
+            return jsonify({
+                "error": "Endpoint bloqueado en este modo",
+                "hint": "En modo " + str(GAME["mode"]) + " no podés usar " + trampa + ". Usá /api/v1/commands?cat=<tema> o /api/v1/commands/<id>.",
+                "mode": GAME["mode"],
+            }), 403
+    # /api/v1/datasets — bloqueado también (revelaría lo cargado)
+    if path == "/api/v1/datasets":
+        return jsonify({
+            "error": "Endpoint bloqueado en este modo",
+            "hint": "En modo " + str(GAME["mode"]) + " no podés listar datasets. Usá /api/v1/commands?cat=<tema> para explorar por categoría.",
+            "mode": GAME["mode"],
+        }), 403
+    # /api/v1/datasets/<name> preview — bloqueado
+    if path.startswith("/api/v1/datasets/") and method == "GET":
+        return jsonify({
+            "error": "Endpoint bloqueado en este modo",
+            "hint": "Preview de datasets deshabilitado. Usá /api/v1/commands?cat=<tema> o /api/v1/commands/<id>.",
+            "mode": GAME["mode"],
+        }), 403
+    # /api/v1/commands sin filtros — bloqueado (debe tener al menos ?cat= o ?q=)
+    if path == "/api/v1/commands":
+        qs = request.args
+        if not (qs.get("cat") or qs.get("q") or qs.get("severity") or qs.get("dataset")):
+            return jsonify({
+                "error": "Endpoint bloqueado en este modo",
+                "hint": "En modo " + str(GAME["mode"]) + " /api/v1/commands exige al menos un filtro: ?cat=<tema>, ?q=<palabra>, ?severity=<nivel>",
+                "mode": GAME["mode"],
+            }), 403
+    return None
+
+
+@app.after_request
+def track_discoveries(resp):
+    """Si el juego está activo y la respuesta trae items, los trackea como descubiertos."""
+    try:
+        if GAME is None or resp.status_code >= 400:
+            return resp
+        # solo trackear GETs que devuelven items
+        path = request.path
+        if request.method != "GET":
+            return resp
+        # no trackear /game/state para no contaminar
+        if path == "/api/v1/game/state":
+            return resp
+        # decodificar body
+        data = resp.get_json(silent=True)
+        if not isinstance(data, dict):
+            return resp
+        # detectar IDs en respuesta
+        new_ids = set()
+        # formato {commands: [...]}
+        for cmd in data.get("commands", []) or []:
+            if isinstance(cmd, dict) and cmd.get("id"):
+                new_ids.add(cmd["id"])
+        # formato {id, cmd, desc, ...} (single command)
+        if data.get("id"):
+            new_ids.add(data["id"])
+        # formato search {results: [...]}
+        for r in data.get("results", []) or []:
+            if isinstance(r, dict) and r.get("id"):
+                new_ids.add(r["id"])
+        # formato random (también tiene id)
+        if new_ids:
+            before = len(DISCOVERED)
+            DISCOVERED.update(new_ids)
+            # si descubrió todos → terminar juego
+            if GAME and len(DISCOVERED & GAME["item_ids"]) >= len(GAME["item_ids"]):
+                # log only — no cortamos la respuesta, el cliente ve "finished" en /game/state
+                DB["history"].append({
+                    "action": "game_finished",
+                    "ts": utc_now_iso(),
+                    "mode": GAME["mode"],
+                    "found": len(DISCOVERED & GAME["item_ids"]),
+                    "total": len(GAME["item_ids"]),
+                })
+    except Exception:
+        pass
+    return resp
 
 
 # ---------------------------------------------------------------------

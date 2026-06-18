@@ -1,0 +1,17 @@
+{
+  "name": "Música",
+  "icon": "🎵",
+  "description": "Canciones, artistas y álbumes de rock, pop y música latina",
+  "items": [
+    {"id": "mus_001", "artista": "Queen",            "cancion": "Bohemian Rhapsody",   "album": "A Night at the Opera", "año": 1975, "genero": "Rock"},
+    {"id": "mus_002", "artista": "The Beatles",      "cancion": "Hey Jude",            "album": "Hey Jude (single)",   "año": 1968, "genero": "Rock"},
+    {"id": "mus_003", "artista": "Michael Jackson",  "cancion": "Billie Jean",         "album": "Thriller",             "año": 1982, "genero": "Pop"},
+    {"id": "mus_004", "artista": "Nirvana",          "cancion": "Smells Like Teen Spirit","album": "Nevermind",         "año": 1991, "genero": "Grunge"},
+    {"id": "mus_005", "artista": "Pink Floyd",       "cancion": "Comfortably Numb",    "album": "The Wall",             "año": 1979, "genero": "Rock progresivo"},
+    {"id": "mus_006", "artista": "Soda Stereo",      "cancion": "De Música Ligera",    "album": "Canción Animal",       "año": 1990, "genero": "Rock latino"},
+    {"id": "mus_007", "artista": "Patricio Rey y sus Redonditos de Ricota", "cancion": "Ji Ji Ji", "album": "Un baión para el ojo idiota", "año": 1986, "genero": "Rock nacional"},
+    {"id": "mus_008", "artista": "Charly García",    "cancion": "Rasguña las piedras", "album": "Clics modernos",       "año": 1983, "genero": "Rock nacional"},
+    {"id": "mus_009", "artista": "Fito Páez",        "cancion": "Tumbas de la gloria",  "album": "El amor después del amor", "año": 1992, "genero": "Rock nacional"},
+    {"id": "mus_010", "artista": "Gustavo Cerati",    "cancion": "Crimen",              "album": "Bocanada",             "año": 1999, "genero": "Rock alternativo"}
+  ]
+}
