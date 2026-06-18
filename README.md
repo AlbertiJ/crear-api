@@ -375,6 +375,13 @@ MIT License — Ver [LICENSE](LICENSE).
 
 ---
 
+## 👥 Créditos
+
+- **Idea y desarrollo**: Juan Alberti
+- **Programación e implementación**: MiniMax (Mavis)
+
+---
+
 ## 🤝 Contribuciones
 
 Ideas para contribuir:

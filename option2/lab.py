@@ -7,6 +7,10 @@ Uso:
     pip install flask
     python lab.py
     # abrí http://localhost:5000
+
+Créditos:
+    Idea y desarrollo:    Juan Alberti
+    Programación:         MiniMax (Mavis)
 """
 import json
 import os
