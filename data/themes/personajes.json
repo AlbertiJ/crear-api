@@ -12,6 +12,11 @@
     {"id": "per_007", "nombre": "Sheldon Cooper",    "obra": "The Big Bang Theory",     "tipo": "Físico",       "creador": "Chuck Lorre"},
     {"id": "per_008", "nombre": "Lisbeth Salander",  "obra": "Millenium",               "tipo": "Hacker",       "creador": "Stieg Larsson"},
     {"id": "per_009", "nombre": "Tyrion Lannister",  "obra": "Game of Thrones",         "tipo": "Político",     "creador": "George R.R. Martin"},
-    {"id": "per_010", "nombre": "Eleven",            "obra": "Stranger Things",         "tipo": "Telequinética","creador": "Duffer Brothers"}
+    {"id": "per_010", "nombre": "Eleven",            "obra": "Stranger Things",         "tipo": "Telequinética","creador": "Duffer Brothers"},
+    {"id": "per_011", "nombre": "Vito Corleone",     "obra": "El Padrino",              "tipo": "Mafioso",       "creador": "Mario Puzo"},
+    {"id": "per_012", "nombre": "Neo",               "obra": "Matrix",                  "tipo": "Hacker",        "creador": "Lana y Lilly Wachowski"},
+    {"id": "per_013", "nombre": "Herminia",          "obra": "Esperanza Mía",           "tipo": "Antiheroína",   "creador": "Pol-ka"},
+    {"id": "per_014", "nombre": "Forrest Gump",      "obra": "Forrest Gump",            "tipo": "Aventurero",    "creador": "Winston Groom"},
+    {"id": "per_015", "nombre": "Indiana Jones",     "obra": "Indiana Jones",           "tipo": "Arqueólogo",    "creador": "George Lucas"}
   ]
 }

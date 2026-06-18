@@ -428,11 +428,6 @@ def unload_dataset(name):
 @app.route("/api/v1/commands", methods=["GET"])
 def list_commands():
     log_query("GET", "/api/v1/commands")
-    if not DB["loaded"]:
-        return jsonify({
-            "error": "DB vacía",
-            "hint": "Cargá un dataset primero: POST /api/v1/datasets/privesc/load"
-        }), 503
 
     cat = request.args.get("cat")
     q = request.args.get("q", "").lower()
@@ -441,7 +436,33 @@ def list_commands():
     limit = int(request.args.get("limit", 100))
 
     results = []
-    for ds_name, ds in DB["loaded"].items():
+    # MODO 4 cross-over: si hay ?pid= y la sala está en playing, devolver DB del RIVAL
+    mode4_pid = request.args.get("pid")
+    mode4_room = None
+    mode4_opp_db = None
+    if mode4_pid:
+        room_code = PLAYER_ROOM.get(mode4_pid)
+        if room_code:
+            r = ROOMS.get(room_code)
+            if r and r["phase"] == "playing" and mode4_pid in r["players"]:
+                mode4_room = r
+                cat_key, opp_items = _get_opponent_db_for_player(r["code"], mode4_pid)
+                if opp_items is not None:
+                    mode4_opp_db = {"rival": {"categories": {cat_key: {
+                        "title": "DB del rival",
+                        "severity": "info",
+                        "commands": opp_items,
+                    }}}}
+    if mode4_opp_db:
+        dss = mode4_opp_db.items()
+    else:
+        if not DB["loaded"]:
+            return jsonify({
+                "error": "DB vacía",
+                "hint": "Cargá un dataset primero: POST /api/v1/datasets/privesc/load"
+            }), 503
+        dss = DB["loaded"].items()
+    for ds_name, ds in dss:
         if dataset and dataset != ds_name:
             continue
         for cat_key, cat_data in (ds.get("categories") or {}).items():
@@ -481,6 +502,28 @@ def list_commands():
 @app.route("/api/v1/commands/<path:cmd_id>")
 def get_command(cmd_id):
     log_query("GET", f"/api/v1/commands/{cmd_id}")
+    # MODO 4 cross-over: si hay ?pid= y la sala está en playing, buscar en DB del RIVAL
+    mode4_pid = request.args.get("pid")
+    if mode4_pid:
+        room_code = PLAYER_ROOM.get(mode4_pid)
+        if room_code:
+            r = ROOMS.get(room_code)
+            if r and r["phase"] == "playing" and mode4_pid in r["players"]:
+                cat_key, opp_items = _get_opponent_db_for_player(r["code"], mode4_pid)
+                if opp_items is not None:
+                    for cmd in opp_items:
+                        if cmd.get("id") == cmd_id:
+                            return jsonify({
+                                "id": cmd_id,
+                                "dataset": "rival",
+                                "category": cat_key,
+                                "category_title": "DB del rival",
+                                "severity": "info",
+                                "cmd": cmd.get("cmd"),
+                                "desc": cmd.get("desc"),
+                                "raw": cmd.get("_raw"),
+                            })
+                    return jsonify({"error": f"Item '{cmd_id}' no encontrado en la DB del rival"}), 404
     # Soporta dos formatos:
     #   A) "mus_001" / "pel_002" — id real de un tema (modo 3)
     #   B) "privesc/suid/3"     — formato viejo dataset/cat/index (modo 2)
@@ -641,11 +684,15 @@ def list_routes():
 
 @app.route("/api/v1/health", methods=["GET"])
 def health():
+    # intentar adivinar la IP del server desde el request (LAN)
+    server_ip = request.host.split(":")[0] if request.host else "127.0.0.1"
     return jsonify({
         "status": "ok",
         "uptime_since": DB["started_at"],
         "datasets_available": sum(1 for v in DATASETS.values() if v is not None),
         "datasets_loaded": len(DB["loaded"]),
+        "server_ip": server_ip,
+        "server_url": request.host_url.rstrip("/"),
         "ts": utc_now_iso()
     })
 
@@ -740,46 +787,77 @@ def dataset_schema(name):
 @app.route("/api/v1/search", methods=["GET"])
 def global_search():
     log_query("GET", "/api/v1/search")
-    if not DB["loaded"]:
-        return jsonify({
-            "error": "DB vacía",
-            "hint": "Cargá un dataset primero: POST /api/v1/datasets/privesc/load"
-        }), 503
     q = request.args.get("q", "").lower().strip()
     if not q:
         return jsonify({"error": "Parámetro 'q' requerido", "example": "/api/v1/search?q=python"}), 400
     limit = int(request.args.get("limit", 50))
     results = []
-    for ds_name, ds in DB["loaded"].items():
-        for cat_key, cat_data in (ds.get("categories") or {}).items():
-            for idx, cmd in enumerate(cat_data.get("commands", [])):
-                haystack = (
-                    cmd.get("cmd", "") + " " +
-                    cmd.get("desc", "") + " " +
-                    cmd.get("_search", "")
-                ).lower()
-                if q in haystack:
-                    cmd_id = cmd.get("id") or f"{ds_name}/{cat_key}/{idx}"
-                    results.append({
-                        "type": "command",
-                        "id": cmd_id,
-                        "dataset": ds_name,
-                        "category": cat_key,
-                        "category_title": cat_data.get("title"),
-                        "severity": cat_data.get("severity"),
-                        "theme": cat_data.get("theme"),
-                        "cmd": cmd.get("cmd"),
-                        "desc": cmd.get("desc")
-                    })
-        for shell_id, shell_data in (ds.get("shells") or {}).items():
-            if q in shell_id.lower() or q in str(shell_data).lower():
+    # MODO 4 cross-over (chequear ANTES de DB vacía)
+    mode4_pid = request.args.get("pid")
+    mode4_opp_items = None
+    if mode4_pid:
+        room_code = PLAYER_ROOM.get(mode4_pid)
+        if room_code:
+            r = ROOMS.get(room_code)
+            if r and r["phase"] == "playing" and mode4_pid in r["players"]:
+                cat_key, opp_items = _get_opponent_db_for_player(r["code"], mode4_pid)
+                if opp_items is not None:
+                    mode4_opp_items = (cat_key, opp_items)
+    if mode4_opp_items:
+        cat_key, opp_items = mode4_opp_items
+        for cmd in opp_items:
+            haystack = (
+                cmd.get("cmd", "") + " " +
+                cmd.get("desc", "") + " " +
+                cmd.get("_search", "")
+            ).lower()
+            if q in haystack:
                 results.append({
-                    "type": "shell",
-                    "id": shell_id,
-                    "dataset": ds_name,
-                    "payload": shell_data.get("payload"),
-                    "desc": shell_data.get("desc")
+                    "type": "command",
+                    "id": cmd.get("id"),
+                    "dataset": "rival",
+                    "category": cat_key,
+                    "category_title": "DB del rival",
+                    "severity": "info",
+                    "cmd": cmd.get("cmd"),
+                    "desc": cmd.get("desc")
                 })
+    else:
+        if not DB["loaded"]:
+            return jsonify({
+                "error": "DB vacía",
+                "hint": "Cargá un dataset primero: POST /api/v1/datasets/privesc/load"
+            }), 503
+        for ds_name, ds in DB["loaded"].items():
+            for cat_key, cat_data in (ds.get("categories") or {}).items():
+                for idx, cmd in enumerate(cat_data.get("commands", [])):
+                    haystack = (
+                        cmd.get("cmd", "") + " " +
+                        cmd.get("desc", "") + " " +
+                        cmd.get("_search", "")
+                    ).lower()
+                    if q in haystack:
+                        cmd_id = cmd.get("id") or f"{ds_name}/{cat_key}/{idx}"
+                        results.append({
+                            "type": "command",
+                            "id": cmd_id,
+                            "dataset": ds_name,
+                            "category": cat_key,
+                            "category_title": cat_data.get("title"),
+                            "severity": cat_data.get("severity"),
+                            "theme": cat_data.get("theme"),
+                            "cmd": cmd.get("cmd"),
+                            "desc": cmd.get("desc")
+                        })
+            for shell_id, shell_data in (ds.get("shells") or {}).items():
+                if q in shell_id.lower() or q in str(shell_data).lower():
+                    results.append({
+                        "type": "shell",
+                        "id": shell_id,
+                        "dataset": ds_name,
+                        "payload": shell_data.get("payload"),
+                        "desc": shell_data.get("desc")
+                    })
     return jsonify({
         "q": q,
         "count": len(results),
@@ -950,6 +1028,373 @@ def _do_load(name):
     DB["loaded"][name] = payload
     DB["history"].append({"action": "load", "dataset": name, "ts": payload["loaded_at"], "source": "autoload"})
     return True, f"cargado ({count_commands(payload)} comandos)"
+
+
+# ---------------------------------------------------------------------
+# MODO 4 — 1 vs 1 MULTIJUGADOR (salas en LAN)
+# ---------------------------------------------------------------------
+# Cada sala tiene:
+#   {
+#     "code": "K7MP",                # 4 chars alfanuméricos
+#     "created_at": iso,
+#     "phase": "waiting" | "loading" | "ready" | "playing" | "finished",
+#     "host_id": "abc",              # id del jugador que creó la sala
+#     "players": {
+#       "abc": {
+#         "name": "Juan",
+#         "joined_at": iso,
+#         "theme": None,             # tema elegido (None hasta que elija)
+#         "ready": False,            # apretó ✓ LISTO
+#         "db": None,                # {categories: {...}} con 15 items random
+#         "discovered": set(),       # IDs que descubrió
+#       },
+#       ...
+#     },
+#     "started_at": None,            # cuando arrancó el timer 1h
+#     "ends_at":   None,            # +1h desde started_at
+#     "winner_id": None,            # id del ganador (None si empate o sin finish)
+#     "items_per_player": 15,
+#     "game_duration_sec": 3600,    # 1 hora
+#   }
+#
+# Cross-over: cuando phase=playing, las queries de un jugador devuelven
+# los items de la DB del RIVAL, y el discovered se trackea por jugador.
+ROOMS = {}  # code -> Room
+# Mapping pid -> code (para que queries con ?pid= encuentren su room sin ambigüedad)
+PLAYER_ROOM = {}
+
+def _gen_room_code():
+    """Genera un código de 4 chars (letras + números, sin 0/O/1/I para confusión)."""
+    import random as _r
+    _r.seed()
+    chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # sin 0/O/1/I
+    return "".join(_r.choice(chars) for _ in range(4))
+
+
+def _new_player():
+    """Genera un player_id único (8 chars)."""
+    import random as _r
+    _r.seed()
+    return "p_" + "".join(_r.choice("abcdef0123456789") for _ in range(8))
+
+
+def _public_room(room, viewer_id=None):
+    """Devuelve la vista pública de la sala (sin la DB del rival, etc.)."""
+    out = {
+        "code": room["code"],
+        "phase": room["phase"],
+        "items_per_player": room["items_per_player"],
+        "created_at": room["created_at"],
+        "started_at": room.get("started_at"),
+        "ends_at":   room.get("ends_at"),
+        "winner_id": room.get("winner_id"),
+        "items_count": room["items_per_player"],  # total que tiene que descubrir cada uno
+        "players": {},
+    }
+    for pid, p in room["players"].items():
+        is_self = (pid == viewer_id)
+        # si es modo playing y NO es self, mostramos found pero NO los IDs
+        # (para no spoilear). Si terminó, mostramos todo.
+        out["players"][pid] = {
+            "name": p["name"],
+            "is_self": is_self,
+            "theme": p.get("theme"),
+            "ready": p.get("ready", False),
+            "found": sum(1 for x in p.get("discovered", set())),
+            "discovered_ids": list(p.get("discovered", set())) if (room["phase"] == "finished" or is_self) else [],
+        }
+    return out
+
+
+def _room_state_for_player(code, player_id):
+    """Helper: vista pública + información útil para el jugador."""
+    room = ROOMS.get(code)
+    if not room:
+        return None, jsonify({"error": f"Sala '{code}' no existe"}), 404
+    state = _public_room(room, viewer_id=player_id)
+    # si está playing, devolver también: remaining_time y si terminó
+    if room["phase"] == "playing" and room.get("ends_at"):
+        from datetime import datetime, timezone
+        try:
+            ends_dt = datetime.fromisoformat(room["ends_at"].replace("Z", "+00:00"))
+            now_dt = datetime.now(timezone.utc)
+            remaining = max(0, int((ends_dt - now_dt).total_seconds()))
+        except Exception:
+            remaining = 0
+        state["remaining_sec"] = remaining
+        # si venció, finalizar automáticamente
+        if remaining == 0 and room["phase"] == "playing":
+            _finish_room_4(code, reason="time_up")
+            state = _public_room(room, viewer_id=player_id)
+    return room, state, 200
+
+
+@app.route("/api/v1/rooms", methods=["POST"])
+def create_room():
+    """Crea una sala nueva (modo 4). Body: {name: 'Juan'}. Devuelve {code, player_id}."""
+    global ROOMS
+    body = request.get_json(silent=True) or {}
+    name = (body.get("name") or "Anónimo").strip()[:20]
+    if not name:
+        return jsonify({"error": "Falta 'name'"}), 400
+    # generar código único
+    for _ in range(20):
+        code = _gen_room_code()
+        if code not in ROOMS:
+            break
+    else:
+        return jsonify({"error": "No se pudo generar código único"}), 500
+    pid = _new_player()
+    now = utc_now_iso()
+    ROOMS[code] = {
+        "code": code,
+        "created_at": now,
+        "phase": "waiting",
+        "host_id": pid,
+        "players": {
+            pid: {
+                "name": name,
+                "joined_at": now,
+                "theme": None,
+                "ready": False,
+                "db": None,
+                "discovered": set(),
+            }
+        },
+        "started_at": None,
+        "ends_at": None,
+        "winner_id": None,
+        "items_per_player": 15,
+        "game_duration_sec": 3600,
+    }
+    PLAYER_ROOM[pid] = code
+    return jsonify({
+        "code": code,
+        "player_id": pid,
+        "you_are_host": True,
+        "join_url": f"/modo4?code={code}&pid={pid}",
+    }), 201
+
+
+@app.route("/api/v1/rooms/<code>/join", methods=["POST"])
+def join_room(code):
+    """Une a una sala existente. Body: {name: 'Pedro'}. Devuelve {player_id}."""
+    global ROOMS
+    room = ROOMS.get(code)
+    if not room:
+        return jsonify({"error": f"Sala '{code}' no existe"}), 404
+    if room["phase"] != "waiting":
+        return jsonify({"error": f"La sala ya está en fase '{room['phase']}', no se puede unir"}), 409
+    if len(room["players"]) >= 2:
+        return jsonify({"error": "Sala llena (ya hay 2 jugadores)"}), 409
+    body = request.get_json(silent=True) or {}
+    name = (body.get("name") or "Anónimo").strip()[:20]
+    if not name:
+        return jsonify({"error": "Falta 'name'"}), 400
+    pid = _new_player()
+    room["players"][pid] = {
+        "name": name,
+        "joined_at": utc_now_iso(),
+        "theme": None,
+        "ready": False,
+        "db": None,
+        "discovered": set(),
+    }
+    PLAYER_ROOM[pid] = code
+    return jsonify({
+        "code": code,
+        "player_id": pid,
+        "you_are_host": False,
+        "join_url": f"/modo4?code={code}&pid={pid}",
+    }), 201
+
+
+@app.route("/api/v1/rooms/<code>", methods=["GET"])
+def get_room(code):
+    """Estado público de la sala. Query: ?pid=<player_id> (opcional)."""
+    player_id = request.args.get("pid")
+    room, state, status = _room_state_for_player(code, player_id)
+    if status != 200:
+        return state, status
+    return jsonify(state)
+
+
+@app.route("/api/v1/rooms/<code>/choose", methods=["POST"])
+def room_choose_theme(code):
+    """Jugador elige tema. Body: {pid, theme}. El server rellena 15 items random."""
+    global ROOMS
+    room = ROOMS.get(code)
+    if not room:
+        return jsonify({"error": f"Sala '{code}' no existe"}), 404
+    body = request.get_json(silent=True) or {}
+    pid = body.get("pid")
+    theme = body.get("theme")
+    if not pid or pid not in room["players"]:
+        return jsonify({"error": "Falta 'pid' o jugador no está en la sala"}), 400
+    if theme not in THEMES:
+        return jsonify({"error": f"Tema '{theme}' no existe", "available": list(THEMES.keys())}), 400
+    # marcar como loading y rellenar DB
+    room["phase"] = "loading"
+    p = room["players"][pid]
+    p["theme"] = theme
+    p["ready"] = False
+    # generar 15 items random del pool del tema
+    import random as _r
+    _r.seed()
+    pool = list(THEMES[theme]["items"])
+    if len(pool) < room["items_per_player"]:
+        return jsonify({"error": f"El tema '{theme}' tiene solo {len(pool)} items, se necesitan {room['items_per_player']}"}), 400
+    chosen = _r.sample(pool, room["items_per_player"])
+    # armar DB del jugador (estructura similar a themes)
+    cat_key = theme
+    cats = {cat_key: {
+        "title": THEMES[theme]["name"],
+        "severity": "info",
+        "theme": theme,
+        "commands": [_theme_item_to_cmd(item, theme) for item in chosen],
+    }}
+    p["db"] = {
+        "name": f"player_{pid}",
+        "description": f"DB de {p['name']} — tema {THEMES[theme]['name']}",
+        "categories": cats,
+        "themes_active": [theme],
+    }
+    return jsonify({
+        "msg": f"Tema '{THEMES[theme]['name']}' elegido. {room['items_per_player']} items cargados en tu DB.",
+        "theme": theme,
+        "items_in_your_db": room["items_per_player"],
+        "hint": "Cuando ambos hayan elegido, los dos aprietan ✓ LISTO y la PC cruza las DBs.",
+    })
+
+
+@app.route("/api/v1/rooms/<code>/ready", methods=["POST"])
+def room_ready(code):
+    """Jugador marca ✓ LISTO. Body: {pid}. Si los 2 están ready, fase pasa a 'ready'."""
+    global ROOMS
+    room = ROOMS.get(code)
+    if not room:
+        return jsonify({"error": f"Sala '{code}' no existe"}), 404
+    body = request.get_json(silent=True) or {}
+    pid = body.get("pid")
+    if not pid or pid not in room["players"]:
+        return jsonify({"error": "Falta 'pid' o jugador no está en la sala"}), 400
+    p = room["players"][pid]
+    if p.get("db") is None:
+        return jsonify({"error": "Elegí un tema primero (POST /choose)"}), 400
+    p["ready"] = True
+    # si los 2 están ready
+    if all(pl.get("ready") for pl in room["players"].values()):
+        room["phase"] = "ready"
+        return jsonify({"msg": "Ambos listos. Ahora el host puede iniciar la partida (POST /start).", "all_ready": True})
+    return jsonify({"msg": f"{p['name']} listo. Esperando al rival...", "all_ready": False})
+
+
+@app.route("/api/v1/rooms/<code>/start", methods=["POST"])
+def room_start(code):
+    """Inicia la partida (solo el host). Cross-over de DBs + timer 1h."""
+    global ROOMS
+    room = ROOMS.get(code)
+    if not room:
+        return jsonify({"error": f"Sala '{code}' no existe"}), 404
+    body = request.get_json(silent=True) or {}
+    pid = body.get("pid")
+    if pid != room["host_id"]:
+        return jsonify({"error": "Solo el host puede iniciar"}), 403
+    if room["phase"] != "ready":
+        return jsonify({"error": f"La sala está en fase '{room['phase']}', se necesita 'ready'"}), 409
+    if not all(pl.get("ready") for pl in room["players"].values()):
+        return jsonify({"error": "Falta que algún jugador apriete LISTO"}), 409
+    # CROSS-OVER: arrancar timer
+    now = utc_now_iso()
+    from datetime import datetime, timedelta, timezone
+    starts_dt = datetime.now(timezone.utc)
+    ends_dt = starts_dt + timedelta(seconds=room["game_duration_sec"])
+    room["phase"] = "playing"
+    room["started_at"] = now
+    room["ends_at"] = ends_dt.isoformat().replace("+00:00", "Z")
+    # log
+    room["players"][room["host_id"]]["discovered"] = set()
+    for p in room["players"].values():
+        if "discovered" not in p or p["discovered"] is None:
+            p["discovered"] = set()
+    DB["history"].append({
+        "action": "room4_started",
+        "ts": now,
+        "code": code,
+        "players": [{"name": p["name"], "theme": p["theme"]} for p in room["players"].values()],
+    })
+    return jsonify({
+        "msg": "Partida iniciada. Timer 1h corriendo.",
+        "started_at": room["started_at"],
+        "ends_at": room["ends_at"],
+        "duration_sec": room["game_duration_sec"],
+        "your_goal": f"Descubrir los {room['items_per_player']} items que cargó tu rival.",
+        "tip": "Tu consola devuelve la DB del RIVAL (no la tuya). Cada item que aparece en una respuesta se marca como descubierto en tu grilla.",
+    })
+
+
+@app.route("/api/v1/rooms/<code>/abandon", methods=["POST"])
+def room_abandon(code):
+    """Jugador se rinde. El rival gana automáticamente."""
+    global ROOMS
+    room = ROOMS.get(code)
+    if not room:
+        return jsonify({"error": f"Sala '{code}' no existe"}), 404
+    body = request.get_json(silent=True) or {}
+    pid = body.get("pid")
+    if pid not in room["players"]:
+        return jsonify({"error": "Jugador no está en la sala"}), 400
+    if room["phase"] not in ("playing", "ready", "loading"):
+        return jsonify({"error": f"No se puede abandonar en fase '{room['phase']}'"}), 409
+    p = room["players"][pid]
+    p["abandoned"] = True
+    _finish_room_4(code, reason=f"{p['name']} abandonó")
+    return jsonify({"msg": "Abandonaste", "summary": _public_room(room, viewer_id=pid)})
+
+
+def _finish_room_4(code, reason="completed"):
+    """Finaliza la partida, calcula ganador por cantidad de descubiertos."""
+    room = ROOMS.get(code)
+    if not room or room["phase"] == "finished":
+        return
+    room["phase"] = "finished"
+    room["ended_at"] = utc_now_iso()
+    founds = {pid: sum(1 for x in p.get("discovered", set())) for pid, p in room["players"].items()}
+    if not founds:
+        room["winner_id"] = None
+    else:
+        max_found = max(founds.values())
+        winners = [pid for pid, f in founds.items() if f == max_found]
+        room["winner_id"] = winners[0] if len(winners) == 1 else None  # None = empate
+    DB["history"].append({
+        "action": "room4_finished",
+        "ts": room["ended_at"],
+        "code": code,
+        "reason": reason,
+        "found": founds,
+        "winner_id": room["winner_id"],
+    })
+    # limpiar mapping
+    for pid in room["players"]:
+        PLAYER_ROOM.pop(pid, None)
+
+
+# Tracking por jugador (cross-over). Devuelve el item del RIVAL al jugador.
+def _get_opponent_db_for_player(code, player_id):
+    """Devuelve (cat_key, items_list) del RIVAL del player, o (None, None) si no hay rival."""
+    room = ROOMS.get(code)
+    if not room:
+        return None, None
+    others = [p for pid, p in room["players"].items() if pid != player_id]
+    if not others:
+        return None, None
+    opp = others[0]
+    if not opp.get("db"):
+        return None, None
+    # tomar la primera (y única) categoría
+    cat_key = list(opp["db"]["categories"].keys())[0]
+    items = opp["db"]["categories"][cat_key]["commands"]
+    return cat_key, items
 
 
 # ---------------------------------------------------------------------
@@ -1193,33 +1638,45 @@ TRAMPA_ENDPOINTS = (
 def trap_guard():
     """Bloquea endpoints trampa en modo 3/4. También bloquea
     /api/v1/commands sin filtros (sin ?cat=, ?q=, ?severity=)."""
-    if GAME is None:
+    # ¿hay juego activo (modo 3 o 4)?
+    active_mode = None
+    if GAME is not None:
+        active_mode = GAME["mode"]
+    else:
+        for r in ROOMS.values():
+            if r["phase"] == "playing":
+                active_mode = 4
+                break
+    if active_mode is None:
         return None  # modo libre, no bloquear nada
     path = request.path
     method = request.method
     if method != "GET":
+        return None
+    # no bloquear endpoints internos del modo 4
+    if path.startswith("/api/v1/rooms"):
         return None
     # endpoints trampa totales
     for trampa in TRAMPA_ENDPOINTS:
         if path == trampa:
             return jsonify({
                 "error": "Endpoint bloqueado en este modo",
-                "hint": "En modo " + str(GAME["mode"]) + " no podés usar " + trampa + ". Usá /api/v1/commands?cat=<tema> o /api/v1/commands/<id>.",
-                "mode": GAME["mode"],
+                "hint": "En modo " + str(active_mode) + " no podés usar " + trampa + ". Usá /api/v1/commands?cat=<tema> o /api/v1/commands/<id>.",
+                "mode": active_mode,
             }), 403
     # /api/v1/datasets — bloqueado también (revelaría lo cargado)
     if path == "/api/v1/datasets":
         return jsonify({
             "error": "Endpoint bloqueado en este modo",
-            "hint": "En modo " + str(GAME["mode"]) + " no podés listar datasets. Usá /api/v1/commands?cat=<tema> para explorar por categoría.",
-            "mode": GAME["mode"],
+            "hint": "En modo " + str(active_mode) + " no podés listar datasets. Usá /api/v1/commands?cat=<tema> para explorar por categoría.",
+            "mode": active_mode,
         }), 403
     # /api/v1/datasets/<name> preview — bloqueado
     if path.startswith("/api/v1/datasets/") and method == "GET":
         return jsonify({
             "error": "Endpoint bloqueado en este modo",
             "hint": "Preview de datasets deshabilitado. Usá /api/v1/commands?cat=<tema> o /api/v1/commands/<id>.",
-            "mode": GAME["mode"],
+            "mode": active_mode,
         }), 403
     # /api/v1/commands sin filtros — bloqueado (debe tener al menos ?cat= o ?q=)
     if path == "/api/v1/commands":
@@ -1227,8 +1684,8 @@ def trap_guard():
         if not (qs.get("cat") or qs.get("q") or qs.get("severity") or qs.get("dataset")):
             return jsonify({
                 "error": "Endpoint bloqueado en este modo",
-                "hint": "En modo " + str(GAME["mode"]) + " /api/v1/commands exige al menos un filtro: ?cat=<tema>, ?q=<palabra>, ?severity=<nivel>",
-                "mode": GAME["mode"],
+                "hint": "En modo " + str(active_mode) + " /api/v1/commands exige al menos un filtro: ?cat=<tema>, ?q=<palabra>, ?severity=<nivel>",
+                "mode": active_mode,
             }), 403
     return None
 
@@ -1237,14 +1694,16 @@ def trap_guard():
 def track_discoveries(resp):
     """Si el juego está activo y la respuesta trae items, los trackea como descubiertos."""
     try:
-        if GAME is None or resp.status_code >= 400:
+        if GAME is None and not ROOMS:
+            return resp
+        if resp.status_code >= 400:
             return resp
         # solo trackear GETs que devuelven items
         path = request.path
         if request.method != "GET":
             return resp
-        # no trackear /game/state para no contaminar
-        if path == "/api/v1/game/state":
+        # no trackear /game/state y /rooms para no contaminar
+        if path == "/api/v1/game/state" or path.startswith("/api/v1/rooms"):
             return resp
         # decodificar body
         data = resp.get_json(silent=True)
@@ -1252,24 +1711,34 @@ def track_discoveries(resp):
             return resp
         # detectar IDs en respuesta
         new_ids = set()
-        # formato {commands: [...]}
         for cmd in data.get("commands", []) or []:
             if isinstance(cmd, dict) and cmd.get("id"):
                 new_ids.add(cmd["id"])
-        # formato {id, cmd, desc, ...} (single command)
         if data.get("id"):
             new_ids.add(data["id"])
-        # formato search {results: [...]}
         for r in data.get("results", []) or []:
             if isinstance(r, dict) and r.get("id"):
                 new_ids.add(r["id"])
-        # formato random (también tiene id)
-        if new_ids:
-            before = len(DISCOVERED)
+        if not new_ids:
+            return resp
+
+        # MODO 4: trackear en el discovered del jugador según ?pid=
+        mode4_pid = request.args.get("pid")
+        if mode4_pid:
+            room_code = PLAYER_ROOM.get(mode4_pid)
+            if room_code:
+                r = ROOMS.get(room_code)
+                if r and r["phase"] == "playing" and mode4_pid in r["players"]:
+                    p = r["players"][mode4_pid]
+                    p["discovered"].update(new_ids)
+                    if len(p["discovered"]) >= r["items_per_player"]:
+                        _finish_room_4(r["code"], reason=f"{p['name']} descubrió todo")
+                    return resp
+
+        # MODO 3: trackear en DISCOVERED global
+        if GAME is not None:
             DISCOVERED.update(new_ids)
-            # si descubrió todos → terminar juego
             if GAME and len(DISCOVERED & GAME["item_ids"]) >= len(GAME["item_ids"]):
-                # log only — no cortamos la respuesta, el cliente ve "finished" en /game/state
                 DB["history"].append({
                     "action": "game_finished",
                     "ts": utc_now_iso(),

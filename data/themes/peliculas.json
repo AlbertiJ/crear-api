@@ -12,6 +12,11 @@
     {"id": "pel_007", "titulo": "El Secreto de sus Ojos",    "director": "Juan José Campanella",     "año": 2009, "genero": "Drama/Suspense",      "pais": "Argentina"},
     {"id": "pel_008", "titulo": "El Eternauta",              "director": "Luís Puenzo",              "año": 1983, "genero": "Ciencia ficción",     "pais": "Argentina"},
     {"id": "pel_009", "titulo": "Parasite",                  "director": "Bong Joon-ho",             "año": 2019, "genero": "Suspense",            "pais": "Corea del Sur"},
-    {"id": "pel_010", "titulo": "Interestelar",              "director": "Christopher Nolan",        "año": 2014, "genero": "Ciencia ficción",     "pais": "EE.UU."}
+    {"id": "pel_010", "titulo": "Interestelar",              "director": "Christopher Nolan",        "año": 2014, "genero": "Ciencia ficción",     "pais": "EE.UU."},
+    {"id": "pel_011", "titulo": "El silencio de los inocentes","director": "Jonathan Demme",         "año": 1991, "genero": "Suspense",            "pais": "EE.UU."},
+    {"id": "pel_012", "titulo": "Gladiador",                 "director": "Ridley Scott",             "año": 2000, "genero": "Acción/Drama",        "pais": "EE.UU."},
+    {"id": "pel_013", "titulo": "El club de la pelea",       "director": "David Fincher",            "año": 1999, "genero": "Drama/Suspense",      "pais": "EE.UU."},
+    {"id": "pel_014", "titulo": "Whiplash",                  "director": "Damien Chazelle",          "año": 2014, "genero": "Drama/Música",        "pais": "EE.UU."},
+    {"id": "pel_015", "titulo": "Nueve reinas",              "director": "Fabián Bielinsky",         "año": 2000, "genero": "Crimen/Drama",        "pais": "Argentina"}
   ]
 }

@@ -2,7 +2,8 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>API Lab — Modo 4 (próximamente)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Lab — Modo 4 · 1 vs 1</title>
 <style>
   body { margin: 0; padding: 0; background: #0a0e1a; color: #e6edf3;
          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -14,55 +15,780 @@
   header a { color: #8b96a8; text-decoration: none; font-size: 13px; border: 1px solid #2a3548;
              padding: 6px 14px; border-radius: 100px; }
   header a:hover { color: #00ff9c; border-color: #00ff9c; }
-  main { max-width: 640px; margin: 0 auto; padding: 60px 24px; text-align: center; }
-  .badge { display: inline-block; padding: 4px 14px; border: 1px solid #ffd83d; color: #ffd83d;
-           border-radius: 100px; font-size: 11px; font-family: 'JetBrains Mono', monospace;
-           font-weight: 700; letter-spacing: 1px; }
-  h2 { color: #ffd83d; font-size: 32px; margin: 24px 0 12px; }
-  p { color: #8b96a8; margin: 0 0 32px; font-size: 15px; }
-  .preview {
-    background: #111827; border: 1px solid #2a3548; border-radius: 12px;
-    padding: 28px; margin: 32px 0; text-align: left;
+  main { max-width: 1280px; margin: 0 auto; padding: 32px 24px; }
+  nav.crumbs { color: #8b96a8; font-size: 12px; margin-bottom: 16px; }
+  nav.crumbs a { color: #00ff9c; text-decoration: none; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ---- LANDING / LOBBY ---- */
+  .landing { max-width: 720px; margin: 0 auto; }
+  h2 { color: #ffd83d; font-size: 32px; margin: 0 0 8px; }
+  p.sub { color: #8b96a8; margin: 0 0 24px; }
+  .ip-banner {
+    background: #111827; border: 1px solid #2a3548; border-radius: 10px;
+    padding: 16px 20px; margin-bottom: 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    color: #8b96a8;
   }
-  .preview h3 { color: #00ff9c; margin: 0 0 14px; font-size: 16px; }
-  .preview ol { margin: 0; padding-left: 22px; color: #c9d1d9; font-size: 14px; }
-  .preview li { margin: 8px 0; }
-  .preview code { color: #ffd83d; background: #0a0e1a; padding: 2px 8px; border-radius: 4px;
-                  font-size: 13px; }
-  a.back { display: inline-block; margin-top: 24px; color: #00d4ff; text-decoration: none;
-           border: 1px solid #00d4ff; padding: 10px 22px; border-radius: 6px;
-           font-family: 'JetBrains Mono', monospace; font-size: 13px; }
-  a.back:hover { background: #00d4ff; color: #0a0e1a; }
+  .ip-banner .label { color: #00ff9c; margin-right: 8px; }
+  .ip-banner code { color: #ffd83d; background: #0a0e1a; padding: 4px 10px; border-radius: 4px; }
+  .lobby-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 600px) { .lobby-grid { grid-template-columns: 1fr; } }
+  .lobby-card {
+    background: #111827; border: 1px solid #2a3548; border-radius: 12px;
+    padding: 24px; text-align: center;
+  }
+  .lobby-card h3 { margin: 0 0 8px; color: #00ff9c; font-family: 'JetBrains Mono', monospace; }
+  .lobby-card p { color: #8b96a8; font-size: 13px; margin: 0 0 16px; }
+  .lobby-card input {
+    width: 100%; padding: 12px 14px; background: #0a0e1a; border: 1px solid #2a3548;
+    border-radius: 6px; color: #00ff9c; font-family: 'JetBrains Mono', monospace; font-size: 18px;
+    font-weight: 700; text-align: center; letter-spacing: 4px; text-transform: uppercase;
+  }
+  .lobby-card input.name {
+    font-size: 14px; font-weight: 400; letter-spacing: normal; text-transform: none;
+    color: #e6edf3; text-align: left;
+  }
+  button.btn {
+    width: 100%; margin-top: 12px; padding: 12px; border: none; border-radius: 8px;
+    cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700;
+    transition: all 0.2s;
+  }
+  button.btn.primary { background: #ffd83d; color: #0a0e1a; }
+  button.btn.primary:hover { box-shadow: 0 4px 16px rgba(255,216,61,0.4); }
+  button.btn.secondary { background: transparent; border: 2px solid #00d4ff; color: #00d4ff; }
+  button.btn.secondary:hover { background: #00d4ff; color: #0a0e1a; }
+  button.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .err { color: #ff4d6d; font-size: 12px; margin-top: 8px; min-height: 18px; }
+
+  /* ---- ROOM LOBBY (esperando rival) ---- */
+  .room-lobby { max-width: 600px; margin: 0 auto; text-align: center; }
+  .code-display {
+    background: linear-gradient(135deg, rgba(255,216,61,0.15), rgba(0,212,255,0.10));
+    border: 1px solid #ffd83d; border-radius: 12px;
+    padding: 24px 32px; margin: 24px 0;
+  }
+  .code-display .label { color: #8b96a8; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; }
+  .code-display .code { font-family: 'JetBrains Mono', monospace; font-size: 64px; font-weight: 800; color: #ffd83d; letter-spacing: 8px; margin: 8px 0; }
+  .code-display .copy { color: #8b96a8; font-size: 12px; }
+  .code-display .copy a { color: #00d4ff; cursor: pointer; text-decoration: underline; }
+  .players-status { display: flex; gap: 16px; justify-content: center; margin: 20px 0; }
+  .player-slot {
+    background: #111827; border: 1px solid #2a3548; border-radius: 10px;
+    padding: 16px 20px; min-width: 160px;
+  }
+  .player-slot.filled { border-color: #00ff9c; background: rgba(0,255,156,0.05); }
+  .player-slot .name { color: #00ff9c; font-weight: 700; }
+  .player-slot .role { color: #8b96a8; font-size: 11px; }
+  .player-slot .waiting { color: #8b96a8; font-style: italic; }
+
+  /* ---- THEME PICK ---- */
+  .theme-pick { max-width: 720px; margin: 0 auto; }
+  .theme-pick h2 { color: #ffd83d; }
+  .themes-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0 24px; }
+  .theme-pick .theme-card { background: #111827; border: 2px solid #2a3548; border-radius: 12px;
+                             padding: 18px; cursor: pointer; text-align: center; transition: all 0.2s; }
+  .theme-pick .theme-card:hover { border-color: #ffd83d; transform: translateY(-2px); }
+  .theme-pick .theme-card.selected { border-color: #00ff9c; background: rgba(0,255,156,0.08); }
+  .theme-pick .theme-card .icon { font-size: 32px; }
+  .theme-pick .theme-card .name { color: #00ff9c; font-family: 'JetBrains Mono', monospace; font-weight: 700; margin-top: 6px; }
+  .theme-pick .theme-card .pool { color: #4d9fff; font-size: 11px; margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+  .loaded-banner {
+    background: #111827; border: 1px solid #00ff9c; border-radius: 10px;
+    padding: 16px 20px; margin: 16px 0; color: #00ff9c; font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  }
+  .loaded-banner small { color: #8b96a8; }
+
+  /* ---- WAITING BOTH READY ---- */
+  .waiting-banner { max-width: 600px; margin: 40px auto; text-align: center; }
+  .waiting-banner .spinner { font-size: 48px; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .waiting-banner h2 { color: #ffd83d; font-size: 24px; margin: 16px 0 8px; }
+  .waiting-banner .status { color: #8b96a8; font-size: 14px; margin-bottom: 8px; }
+  .waiting-banner .checklist { background: #111827; border: 1px solid #2a3548; border-radius: 10px; padding: 16px; margin: 16px 0; text-align: left; }
+  .waiting-banner .checklist .row { display: flex; align-items: center; gap: 10px; padding: 4px 0; color: #8b96a8; }
+  .waiting-banner .checklist .row.done { color: #00ff9c; }
+  .waiting-banner .checklist .row.host-only { color: #ffd83d; }
+
+  /* ---- GAME ---- */
+  .game-grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
+  @media (max-width: 900px) { .game-grid { grid-template-columns: 1fr; } }
+  .game-header {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #111827; border: 1px solid #2a3548; border-radius: 10px;
+    padding: 14px 18px; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;
+  }
+  .game-header .left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .game-header .pill {
+    background: linear-gradient(90deg, #ffd83d, #ff8a3d); color: #0a0e1a;
+    padding: 4px 12px; border-radius: 100px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+  }
+  .game-header .timer { font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #ffd83d; font-weight: 700; }
+  .game-header .timer.urgent { color: #ff4d6d; animation: pulse 0.5s infinite; }
+  .game-header .score-row { display: flex; gap: 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #8b96a8; }
+  .game-header .score-row strong { color: #00ff9c; font-size: 16px; }
+  .game-header .score-row .me { color: #00ff9c; }
+  button.abandon {
+    background: transparent; border: 1px solid #ff4d6d; color: #ff4d6d;
+    padding: 6px 14px; border-radius: 6px; font-weight: 600; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
+  button.abandon:hover { background: #ff4d6d; color: #0a0e1a; }
+
+  .console-box {
+    background: #050709; border: 1px solid #2a3548; border-radius: 10px;
+    display: flex; flex-direction: column; height: 600px;
+  }
+  .console-box .output {
+    flex: 1; overflow-y: auto; padding: 12px 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5;
+    word-break: break-word; overflow-wrap: anywhere;
+  }
+  .console-box .output .req { color: #00d4ff; }
+  .console-box .output .resp { color: #c9d1d9; white-space: pre-wrap; margin-bottom: 8px; }
+  .console-box .output .err { color: #ff4d6d; }
+  .console-box .output .ok { color: #00ff9c; }
+  .console-box .output .new { background: rgba(255,216,61,0.15); padding: 4px 8px; border-left: 3px solid #ffd83d; margin: 6px 0; }
+  .console-box .input-row { display: flex; border-top: 1px solid #2a3548; }
+  .console-box .input-row span { padding: 12px 14px; color: #ffd83d; font-family: 'JetBrains Mono', monospace; background: #0a0e1a; border-right: 1px solid #2a3548; }
+  .console-box .input-row input { flex: 1; background: #050709; color: #e6edf3; border: none; padding: 12px 14px; font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none; }
+  .console-box .input-row input:focus { background: #0a0e1a; }
+  .console-box .quick { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; background: #0a0e1a; border-top: 1px solid #2a3548; }
+  .console-box .quick button { background: transparent; border: 1px solid #2a3548; color: #8b96a8; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .console-box .quick button:hover { border-color: #ffd83d; color: #ffd83d; }
+
+  .grid-panel {
+    background: #111827; border: 1px solid #2a3548; border-radius: 10px;
+    padding: 18px; max-height: 600px; overflow-y: auto;
+  }
+  .grid-panel h3 { margin: 0 0 4px; font-size: 14px; color: #ffd83d; font-family: 'JetBrains Mono', monospace; }
+  .grid-panel .sub { color: #8b96a8; font-size: 12px; margin-bottom: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .cell {
+    aspect-ratio: 1; border: 1px solid #2a3548; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: #4d9fff; font-family: 'JetBrains Mono', monospace;
+    text-align: center; padding: 4px;
+  }
+  .cell.found { background: rgba(255,216,61,0.15); border-color: #ffd83d; color: #ffd83d; text-decoration: line-through; }
+  .cell .id-text { font-size: 9px; opacity: 0.6; }
+
+  /* ---- FIN ---- */
+  .fin { max-width: 640px; margin: 40px auto; text-align: center; }
+  .fin h2 { font-size: 40px; margin: 16px 0 8px; }
+  .fin h2.win { color: #ffd83d; }
+  .fin h2.lose { color: #ff4d6d; }
+  .fin h2.tie { color: #8b96a8; }
+  .fin h2.timeout { color: #ff4d6d; }
+  .fin .versus {
+    display: flex; justify-content: center; align-items: center; gap: 32px;
+    background: #111827; border: 1px solid #2a3548; border-radius: 12px;
+    padding: 24px; margin: 24px 0;
+  }
+  .fin .vs-player { text-align: center; }
+  .fin .vs-player .name { color: #00ff9c; font-weight: 700; font-size: 18px; font-family: 'JetBrains Mono', monospace; }
+  .fin .vs-player .score { color: #ffd83d; font-size: 48px; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin: 8px 0; }
+  .fin .vs-player .label { color: #8b96a8; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  .fin .vs-player.winner { color: #ffd83d; }
+  .fin .vs-player.winner .name { color: #ffd83d; }
+  .fin .vs-player.winner .score { color: #ffd83d; }
+  .fin .vs-player .crown { font-size: 24px; }
+  .fin .vs-divider { color: #8b96a8; font-size: 24px; font-weight: 700; }
+  .fin .actions { display: flex; gap: 12px; margin-top: 24px; justify-content: center; }
+  .fin .actions a, .fin .actions button { padding: 14px 24px; border-radius: 8px; text-decoration: none; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+  .fin .actions .primary { background: #ffd83d; color: #0a0e1a; border: none; }
+  .fin .actions .secondary { background: transparent; border: 1px solid #8b96a8; color: #8b96a8; }
+  .fin .actions .secondary:hover { border-color: #00d4ff; color: #00d4ff; }
 </style>
 </head>
 <body>
+
 <header>
-  <h1>⚡ API Lab</h1>
+  <h1>⚡ API Lab — Modo 4</h1>
   <a href="/">← Inicio</a>
 </header>
+
 <main>
-  <span class="badge">MODO 4 · 1 VS 1 (MULTIJUGADOR)</span>
-  <h2>⚔️ Próximamente</h2>
-  <p>Dos amigos en LAN, cada uno carga una DB con tema fijo (música / pelis / series / personajes / bandas), las DBs se rotan, y empiezan las consultas contrarreloj. El que descubre más items gana.</p>
+  <nav class="crumbs"><a href="/">Inicio</a> &gt; Modo 4 &gt; <span id="crumbsState">Lobby</span></nav>
 
-  <div class="preview">
-    <h3>Cómo va a funcionar:</h3>
-    <ol>
-      <li>Los 2 se conectan a <code>http://IP-DEL-SERVER:5050/modo4</code></li>
-      <li>Uno crea la sala (código de 4 chars), el otro se une</li>
-      <li>Cada uno tipea su nombre</li>
-      <li>Eligen tema fijo (música, pelis, series, personajes, bandas)</li>
-      <li>La PC rellena 15 items random — apretan <code>✓ LISTO</code></li>
-      <li>Cuando los 2 están listos: las DBs se rotan (cross-over)</li>
-      <li>Botón <code>▶ COMENZAR</code> → contador regresivo de <strong>1 hora</strong></li>
-      <li>Mientras corre: cada uno consulta la DB del rival</li>
-      <li>Cada item descubierto se tacha en la grilla al lado</li>
-      <li>Si se llena la grilla: <code>¡GANASTE!</code> (o empate)</li>
-      <li>Si llega a 1 hora: <code>ABANDONAR</code> automático</li>
-    </ol>
-  </div>
+  <!-- ====== LANDING ====== -->
+  <section id="screen-landing" class="screen active">
+    <div class="landing">
+      <h2>⚔️ Modo 4 — 1 vs 1</h2>
+      <p class="sub">Dos amigos, un server en LAN. Cada uno elige tema y carga 15 items random. Las DBs se rotan y empieza la búsqueda contrarreloj (1 hora). El que descubre más items gana.</p>
 
-  <a href="/" class="back">← Volver al menú</a>
+      <div class="ip-banner">
+        <div><span class="label">IP del server:</span><code id="serverIP">—</code></div>
+        <div style="margin-top: 6px; font-size: 12px;">Los 2 jugadores se conectan a esa URL y se unen con el mismo código de sala.</div>
+      </div>
+
+      <div class="lobby-grid">
+        <div class="lobby-card">
+          <h3>🎮 Crear sala</h3>
+          <p>Sos el host. Tu rival se une con tu código.</p>
+          <input class="name" id="hostName" placeholder="Tu nombre" maxlength="20">
+          <button class="btn primary" onclick="createRoom()">Crear sala</button>
+          <div class="err" id="createErr"></div>
+        </div>
+        <div class="lobby-card">
+          <h3>🚪 Unirse a sala</h3>
+          <p>Tu amigo te pasó un código de 4 letras.</p>
+          <input id="joinCode" placeholder="K7MP" maxlength="4" style="text-transform:uppercase">
+          <input class="name" id="joinName" placeholder="Tu nombre" maxlength="20" style="margin-top:8px">
+          <button class="btn secondary" onclick="joinRoom()">Unirse</button>
+          <div class="err" id="joinErr"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== ROOM LOBBY ====== -->
+  <section id="screen-room" class="screen">
+    <div class="room-lobby">
+      <h2>🚪 Sala <span id="roomCodeHeader">—</span></h2>
+      <p class="sub">Pasale este código a tu rival y que lo tipee en la pantalla anterior.</p>
+      <div class="code-display">
+        <div class="label">CÓDIGO DE SALA</div>
+        <div class="code" id="roomCode">—</div>
+        <div class="copy">Pegalo: <a onclick="copyJoinLink()">copiar link</a></div>
+      </div>
+      <div class="players-status">
+        <div class="player-slot filled">
+          <div class="role">HOST</div>
+          <div class="name" id="hostNameDisplay">—</div>
+        </div>
+        <div class="player-slot" id="guestSlot">
+          <div class="role">RIVAL</div>
+          <div class="waiting" id="guestNameDisplay">Esperando…</div>
+        </div>
+      </div>
+      <p class="sub" id="lobbyHint" style="color:#ffd83d">Esperando que se una el rival. Esta pantalla se actualiza sola.</p>
+    </div>
+  </section>
+
+  <!-- ====== THEME PICK ====== -->
+  <section id="screen-theme" class="screen">
+    <div class="theme-pick">
+      <h2>🎨 Elegí tu tema</h2>
+      <p class="sub">La PC va a rellenar 15 items random de este tema. Tu rival va a tener que descubrirlos.</p>
+      <div class="themes-list" id="themesList"></div>
+      <div id="loadedBanner" class="loaded-banner" style="display:none">
+        ✓ DB cargada con 15 items. <small>Esperando al rival...</small>
+      </div>
+      <button class="btn primary" id="readyBtn" onclick="markReady()" disabled>✓ LISTO</button>
+      <div class="err" id="themeErr"></div>
+    </div>
+  </section>
+
+  <!-- ====== WAITING BOTH READY ====== -->
+  <section id="screen-wait" class="screen">
+    <div class="waiting-banner">
+      <div class="spinner">⏳</div>
+      <h2 id="waitTitle">Esperando al rival</h2>
+      <div class="status" id="waitStatus">—</div>
+      <div class="checklist">
+        <div class="row" id="check-host-theme"><span>○</span> Host eligió tema</div>
+        <div class="row" id="check-host-ready"><span>○</span> Host apretó LISTO</div>
+        <div class="row" id="check-guest-theme"><span>○</span> Rival eligió tema</div>
+        <div class="row" id="check-guest-ready"><span>○</span> Rival apretó LISTO</div>
+        <div class="row host-only" id="check-start"><span>○</span> <strong>Host: apretá ▶ COMENZAR</strong></div>
+      </div>
+      <button class="btn primary" id="startBtn" onclick="startGame()" style="display:none;max-width:300px;margin:24px auto 0">▶ COMENZAR PARTIDA</button>
+    </div>
+  </section>
+
+  <!-- ====== GAME ====== -->
+  <section id="screen-game" class="screen">
+    <div class="game-header">
+      <div class="left">
+        <span class="pill">⚔️ MODO 4</span>
+        <div class="score-row">
+          <span class="me">Vos: <strong id="myScore">0</strong>/15</span>
+          <span>Rival: <strong id="rivalScore">0</strong>/15</span>
+        </div>
+      </div>
+      <div class="timer" id="timer">60:00</div>
+      <button class="abandon" onclick="abandon()">🏳 ABANDONAR</button>
+    </div>
+
+    <div class="game-grid">
+      <div class="console-box">
+        <div class="output" id="consoleOut"></div>
+        <div class="quick" id="quickActions"></div>
+        <div class="input-row">
+          <span>GET</span>
+          <input type="text" id="cmdInput" placeholder="/api/v1/commands?cat=peliculas" autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+      <div class="grid-panel">
+        <h3>📋 Tu grilla</h3>
+        <div class="sub">15 items del rival. Tachalos a medida que los descubrís.</div>
+        <div class="grid" id="discoveredGrid"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== FIN ====== -->
+  <section id="screen-fin" class="screen">
+    <div class="fin">
+      <h2 id="finTitle" class="tie">🏁 Fin de la partida</h2>
+      <div class="versus">
+        <div class="vs-player" id="playerA">
+          <div class="crown" style="visibility:hidden">👑</div>
+          <div class="name" id="finNameA">—</div>
+          <div class="score" id="finScoreA">0</div>
+          <div class="label">descubiertos</div>
+        </div>
+        <div class="vs-divider">VS</div>
+        <div class="vs-player" id="playerB">
+          <div class="crown" style="visibility:hidden">👑</div>
+          <div class="name" id="finNameB">—</div>
+          <div class="score" id="finScoreB">0</div>
+          <div class="label">descubiertos</div>
+        </div>
+      </div>
+      <p class="sub" id="finSub">—</p>
+      <div class="actions">
+        <button class="primary" onclick="location.reload()">🔄 Nueva partida</button>
+        <a href="/" class="secondary">← Volver al menú</a>
+      </div>
+    </div>
+  </section>
 </main>
+
+<script>
+// ========== STATE ==========
+const STATE = {
+  me: { id: null, name: null },
+  room: { code: null },
+  pollInterval: null,
+  timerInterval: null,
+  discovered: new Set(),
+  themes: [],
+};
+
+// ========== URL PARAMS ==========
+const PARAMS = new URLSearchParams(location.search);
+const URL_CODE = PARAMS.get("code");
+const URL_PID  = PARAMS.get("pid");
+
+// ========== INIT ==========
+async function init() {
+  // mostrar IP del server
+  try {
+    const h = await fetch("/api/v1/health").then(r => r.json());
+    STATE.serverIP = h.server_ip || location.host;
+    document.getElementById("serverIP").textContent = STATE.serverIP;
+  } catch (e) {
+    document.getElementById("serverIP").textContent = location.host;
+  }
+  // cargar temas
+  STATE.themes = (await fetch("/api/v1/themes").then(r => r.json())).themes;
+
+  // si ya hay ?code y ?pid en la URL, ir directo a la sala
+  if (URL_CODE && URL_PID) {
+    STATE.me.id = URL_PID;
+    const r = await fetch(`/api/v1/rooms/${URL_CODE}?pid=${URL_PID}`).then(r => r.json());
+    if (r.error) { alert("Sala no encontrada, creá una nueva."); return; }
+    STATE.room.code = URL_CODE;
+    const mePlayer = r.players[URL_PID];
+    STATE.me.name = mePlayer ? mePlayer.name : "?";
+    enterRoomScreen(r);
+    startPolling();
+    return;
+  }
+}
+init();
+
+// ========== LANDING ==========
+async function createRoom() {
+  const name = document.getElementById("hostName").value.trim();
+  if (!name) { document.getElementById("createErr").textContent = "Tipeá tu nombre"; return; }
+  const r = await fetch("/api/v1/rooms", { method: "POST", headers: {"Content-Type":"application/json"},
+                                             body: JSON.stringify({ name }) }).then(r => r.json());
+  if (r.error) { document.getElementById("createErr").textContent = r.error; return; }
+  STATE.me.id = r.player_id;
+  STATE.me.name = name;
+  STATE.room.code = r.code;
+  // redirigir con ?code y ?pid en la URL para que se pueda recargar
+  history.replaceState(null, "", `?code=${r.code}&pid=${r.player_id}`);
+  document.getElementById("roomCode").textContent = r.code;
+  document.getElementById("roomCodeHeader").textContent = r.code;
+  document.getElementById("hostNameDisplay").textContent = name;
+  showScreen("room");
+  startPolling();
+}
+
+async function joinRoom() {
+  const code = document.getElementById("joinCode").value.trim().toUpperCase();
+  const name = document.getElementById("joinName").value.trim();
+  if (!code || code.length !== 4) { document.getElementById("joinErr").textContent = "Código de 4 letras"; return; }
+  if (!name) { document.getElementById("joinErr").textContent = "Tipeá tu nombre"; return; }
+  const r = await fetch(`/api/v1/rooms/${code}/join`, { method: "POST", headers: {"Content-Type":"application/json"},
+                                                         body: JSON.stringify({ name }) }).then(r => r.json());
+  if (r.error) { document.getElementById("joinErr").textContent = r.error; return; }
+  STATE.me.id = r.player_id;
+  STATE.me.name = name;
+  STATE.room.code = code;
+  history.replaceState(null, "", `?code=${code}&pid=${r.player_id}`);
+  document.getElementById("roomCode").textContent = code;
+  document.getElementById("roomCodeHeader").textContent = code;
+  document.getElementById("hostNameDisplay").textContent = name + " (host)";
+  document.getElementById("guestNameDisplay").textContent = name;
+  document.getElementById("guestNameDisplay").classList.remove("waiting");
+  document.getElementById("guestSlot").classList.add("filled");
+  // mostrar sala directamente (con el rival ya dentro)
+  enterRoomScreen({ code, players: { /* placeholder, polling actualiza */ } });
+  startPolling();
+}
+
+function copyJoinLink() {
+  const link = location.origin + "/modo4?code=" + STATE.room.code;
+  navigator.clipboard.writeText(link).then(() => {
+    alert("Link copiado al portapapeles:\n" + link);
+  });
+}
+
+// ========== POLLING (común) ==========
+function startPolling() {
+  if (STATE.pollInterval) clearInterval(STATE.pollInterval);
+  STATE.pollInterval = setInterval(pollRoom, 2000);
+  pollRoom();
+}
+
+async function pollRoom() {
+  if (!STATE.room.code || !STATE.me.id) return;
+  const r = await fetch(`/api/v1/rooms/${STATE.room.code}?pid=${STATE.me.id}`).then(r => r.json());
+  if (r.error) { console.warn("Sala error:", r.error); return; }
+  // ROOM lobby: si solo está el host, mostrar esperando. Si están los 2, pasar a tema
+  const playerIds = Object.keys(r.players);
+  if (r.phase === "waiting" && playerIds.length === 1) {
+    // lobby - solo host
+    showScreen("room");
+    const otherId = playerIds.find(pid => pid !== STATE.me.id);
+    if (!otherId) {
+      document.getElementById("guestNameDisplay").textContent = "Esperando…";
+      document.getElementById("guestNameDisplay").classList.add("waiting");
+      document.getElementById("guestSlot").classList.remove("filled");
+    }
+  }
+  if (r.phase === "waiting" && playerIds.length === 2) {
+    // los 2 están, ir a tema
+    const otherId = playerIds.find(pid => pid !== STATE.me.id);
+    const other = r.players[otherId];
+    document.getElementById("guestNameDisplay").textContent = other.name;
+    document.getElementById("guestNameDisplay").classList.remove("waiting");
+    document.getElementById("guestSlot").classList.add("filled");
+    enterThemeScreen();
+  }
+  if (r.phase === "loading" || r.phase === "ready") {
+    enterWaitScreen(r);
+  }
+  if (r.phase === "playing") {
+    enterGameScreen(r);
+  }
+  if (r.phase === "finished") {
+    enterFinScreen(r);
+  }
+}
+
+// ========== ROOM LOBBY ==========
+function enterRoomScreen(r) {
+  showScreen("room");
+  document.getElementById("crumbsState").textContent = "Sala " + STATE.room.code;
+}
+
+// ========== THEME PICK ==========
+function enterThemeScreen() {
+  showScreen("theme");
+  document.getElementById("crumbsState").textContent = "Elegir tema";
+  const list = document.getElementById("themesList");
+  list.innerHTML = "";
+  for (const t of STATE.themes) {
+    const card = document.createElement("div");
+    card.className = "theme-card";
+    card.dataset.themeId = t.id;
+    card.onclick = () => pickTheme(t.id, card);
+    card.innerHTML = `
+      <div class="icon">${t.icon}</div>
+      <div class="name">${t.name}</div>
+      <div class="pool">${t.pool_size} items</div>
+    `;
+    list.appendChild(card);
+  }
+}
+
+async function pickTheme(themeId, card) {
+  document.querySelectorAll(".theme-card").forEach(c => c.classList.remove("selected"));
+  card.classList.add("selected");
+  const r = await fetch(`/api/v1/rooms/${STATE.room.code}/choose`, {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ pid: STATE.me.id, theme: themeId })
+  }).then(r => r.json());
+  if (r.error) { document.getElementById("themeErr").textContent = r.error; return; }
+  document.getElementById("loadedBanner").style.display = "block";
+  document.getElementById("loadedBanner").innerHTML = "✓ DB cargada con 15 items random de <strong>" + themeId + "</strong>. <small>Ya podés apretar LISTO.</small>";
+  document.getElementById("readyBtn").disabled = false;
+  STATE.myTheme = themeId;
+}
+
+async function markReady() {
+  const r = await fetch(`/api/v1/rooms/${STATE.room.code}/ready`, {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ pid: STATE.me.id })
+  }).then(r => r.json());
+  if (r.error) { document.getElementById("themeErr").textContent = r.error; return; }
+  document.getElementById("readyBtn").disabled = true;
+  document.getElementById("readyBtn").textContent = "✓ LISTO — esperando al rival";
+}
+
+// ========== WAIT BOTH READY ==========
+function enterWaitScreen(r) {
+  showScreen("wait");
+  document.getElementById("crumbsState").textContent = "Esperando";
+  const playerIds = Object.keys(r.players);
+  const mePlayer = r.players[STATE.me.id];
+  const otherId = playerIds.find(pid => pid !== STATE.me.id);
+  const other = otherId ? r.players[otherId] : null;
+  const amHost = (STATE.me.id === Object.keys(r.players)[0] && !otherId) || (mePlayer && mePlayer.is_self);
+  // en realidad, host_id lo podemos sacar del state... simplifico: el que creó la sala es host
+  // y el que se unió es guest. Si solo hay 1 jugador, el que esté es host.
+  // Vamos por el nombre que tipeó primero en la URL al crear.
+  const hostLikely = STATE.me.name === document.getElementById("hostNameDisplay").textContent;
+  document.getElementById("waitTitle").textContent = "Esperando al rival";
+  // checks
+  document.getElementById("check-host-theme").classList.toggle("done", mePlayer && mePlayer.theme);
+  document.getElementById("check-host-theme").querySelector("span").textContent = mePlayer && mePlayer.theme ? "●" : "○";
+  document.getElementById("check-host-ready").classList.toggle("done", mePlayer && mePlayer.ready);
+  document.getElementById("check-host-ready").querySelector("span").textContent = mePlayer && mePlayer.ready ? "●" : "○";
+  if (other) {
+    document.getElementById("check-guest-theme").classList.toggle("done", other.theme);
+    document.getElementById("check-guest-theme").querySelector("span").textContent = other.theme ? "●" : "○";
+    document.getElementById("check-guest-ready").classList.toggle("done", other.ready);
+    document.getElementById("check-guest-ready").querySelector("span").textContent = other.ready ? "●" : "○";
+  }
+  // mostrar botón COMENZAR solo si ambos están ready
+  const allReady = mePlayer && mePlayer.ready && other && other.ready;
+  if (allReady) {
+    document.getElementById("waitStatus").textContent = "Ambos listos. " + (hostLikely ? "Vos sos el host, dale a COMENZAR." : "Esperando que el host apriete COMENZAR…");
+    if (hostLikely) document.getElementById("startBtn").style.display = "block";
+    document.getElementById("check-start").classList.add("done");
+  } else {
+    document.getElementById("waitStatus").textContent = "Esperando que ambos aprieten LISTO…";
+    document.getElementById("startBtn").style.display = "none";
+  }
+}
+
+async function startGame() {
+  const r = await fetch(`/api/v1/rooms/${STATE.room.code}/start`, {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ pid: STATE.me.id })
+  }).then(r => r.json());
+  if (r.error) { alert(r.error); return; }
+}
+
+// ========== GAME ==========
+function enterGameScreen(r) {
+  showScreen("game");
+  document.getElementById("crumbsState").textContent = "En juego";
+  // grilla
+  const grid = document.getElementById("discoveredGrid");
+  grid.innerHTML = "";
+  for (let i = 0; i < 15; i++) {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    cell.innerHTML = `<span class="id-text">?${i+1}</span>`;
+    cell.id = "cell-" + i;
+    grid.appendChild(cell);
+  }
+  // scores
+  const mePlayer = r.players[STATE.me.id];
+  if (mePlayer) {
+    document.getElementById("myScore").textContent = mePlayer.found;
+    STATE.discovered = new Set(mePlayer.discovered_ids || []);
+  }
+  const playerIds = Object.keys(r.players);
+  const otherId = playerIds.find(pid => pid !== STATE.me.id);
+  if (otherId) {
+    const other = r.players[otherId];
+    document.getElementById("rivalScore").textContent = other.found;
+  }
+  // celdas ya tachadas
+  markDiscoveredCellsFromState();
+  // timer
+  if (!STATE.timerInterval) {
+    STATE.timerInterval = setInterval(updateTimer, 1000);
+  }
+  // quick actions
+  const qa = document.getElementById("quickActions");
+  qa.innerHTML = "";
+  // buscar el tema del RIVAL para sugerir ?cat= ese tema
+  const rivalTheme = otherId ? r.players[otherId].theme : null;
+  if (rivalTheme) {
+    const b = document.createElement("button");
+    b.textContent = "?cat=" + rivalTheme;
+    b.onclick = () => { document.getElementById("cmdInput").value = "/api/v1/commands?pid=" + STATE.me.id + [char]38 + "cat=" + rivalTheme; runCmd(); };
+    qa.appendChild(b);
+  }
+  const bq = document.createElement("button");
+  bq.textContent = "?q=palabra";
+  bq.onclick = () => { document.getElementById("cmdInput").value = "/api/v1/commands?pid=" + STATE.me.id + [char]38 + "q=Rock"; runCmd(); };
+  qa.appendChild(bq);
+  const bh = document.createElement("button");
+  bh.textContent = "/help";
+  bh.onclick = () => { document.getElementById("cmdInput").value = "/api/v1/help"; runCmd(); };
+  qa.appendChild(bh);
+  // bienvenida consola
+  if (!STATE._welcomed) {
+    STATE._welcomed = true;
+    appendConsole("ok", "✓ Partida iniciada. Timer 1h corriendo.");
+    appendConsole("ok", "ℹ  Tu consola devuelve la DB del RIVAL (no la tuya). Cada item en una respuesta se marca como descubierto.");
+    appendConsole("ok", "ℹ  Endpoints bloqueados: /db, /datasets, /shells, /random, /commands sin filtro");
+  }
+  document.getElementById("cmdInput").focus();
+}
+
+function updateTimer() {
+  fetch(`/api/v1/rooms/${STATE.room.code}?pid=${STATE.me.id}`).then(r => r.json()).then(r => {
+    const sec = r.remaining_sec || 0;
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    const t = document.getElementById("timer");
+    t.textContent = m + ":" + String(s).padStart(2, "0");
+    t.classList.toggle("urgent", sec < 60);
+    // scores
+    const mePlayer = r.players[STATE.me.id];
+    if (mePlayer) {
+      document.getElementById("myScore").textContent = mePlayer.found;
+      // discovered del server
+      const newSet = new Set(mePlayer.discovered_ids || []);
+      if (newSet.size > STATE.discovered.size) {
+        const diff = [...newSet].filter(x => !STATE.discovered.has(x));
+        STATE.discovered = newSet;
+        markDiscoveredCellsFromState();
+        if (diff.length > 0) {
+          appendConsole("new", "🎉 " + diff.length + " nuevo(s) descubierto(s): " + diff.join(", "));
+        }
+      }
+    }
+    const playerIds = Object.keys(r.players);
+    const otherId = playerIds.find(pid => pid !== STATE.me.id);
+    if (otherId) {
+      document.getElementById("rivalScore").textContent = r.players[otherId].found;
+    }
+    if (r.phase === "finished") {
+      enterFinScreen(r);
+    }
+  }).catch(() => {});
+}
+
+function markDiscoveredCellsFromState() {
+  const cells = Array.from(document.querySelectorAll("#discoveredGrid .cell"));
+  const ids = Array.from(STATE.discovered);
+  for (let i = 0; i < cells.length; i++) {
+    const cell = cells[i];
+    if (i < ids.length) {
+      cell.classList.add("found");
+      cell.innerHTML = `<span class="id-text">${ids[i].replace(/_/g, "<br>")}</span>`;
+    } else {
+      cell.classList.remove("found");
+      cell.innerHTML = `<span class="id-text">?${i+1}</span>`;
+    }
+  }
+}
+
+async function runCmd() {
+  const input = document.getElementById("cmdInput");
+  let path = input.value.trim();
+  if (!path) return;
+  if (!path.startsWith("/")) path = "/" + path;
+  // asegurar que tiene ?pid
+  if (!path.includes("pid=")) path += (path.includes("?") ? [char]38 : "?") + "pid=" + STATE.me.id;
+  input.value = "";
+  appendConsole("req", "→ GET " + path);
+  try {
+    const r = await fetch(path);
+    const d = await r.json();
+    const txt = JSON.stringify(d, null, 2);
+    const cls = r.ok ? "resp" : "err";
+    appendConsole(cls, (r.ok ? "✓ " + r.status : "✗ " + r.status) + "\n" + txt);
+    // descubiertos vienen del timer polling, no del response directo
+  } catch (e) {
+    appendConsole("err", "✗ " + e.message);
+  }
+}
+
+function appendConsole(cls, text) {
+  const out = document.getElementById("consoleOut");
+  const div = document.createElement("div");
+  div.className = cls;
+  div.textContent = text;
+  out.appendChild(div);
+  out.scrollTop = out.scrollHeight;
+}
+
+async function abandon() {
+  if (!confirm("¿Rendirte? El rival gana.")) return;
+  await fetch(`/api/v1/rooms/${STATE.room.code}/abandon`, {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ pid: STATE.me.id })
+  });
+}
+
+// ========== FIN ==========
+function enterFinScreen(r) {
+  if (STATE.timerInterval) { clearInterval(STATE.timerInterval); STATE.timerInterval = null; }
+  if (STATE.pollInterval) { clearInterval(STATE.pollInterval); STATE.pollInterval = null; }
+  showScreen("fin");
+  document.getElementById("crumbsState").textContent = "Fin";
+  const playerIds = Object.keys(r.players);
+  const mePlayer = r.players[STATE.me.id];
+  const otherId = playerIds.find(pid => pid !== STATE.me.id);
+  const other = otherId ? r.players[otherId] : null;
+  document.getElementById("finNameA").textContent = mePlayer ? mePlayer.name : "Vos";
+  document.getElementById("finNameB").textContent = other ? other.name : "Rival";
+  document.getElementById("finScoreA").textContent = mePlayer ? mePlayer.found : 0;
+  document.getElementById("finScoreB").textContent = other ? other.found : 0;
+  // winner
+  document.querySelector("#playerA .crown").style.visibility = "hidden";
+  document.querySelector("#playerB .crown").style.visibility = "hidden";
+  document.getElementById("playerA").classList.remove("winner");
+  document.getElementById("playerB").classList.remove("winner");
+  let title = document.getElementById("finTitle");
+  title.className = "";
+  if (r.winner_id === STATE.me.id) {
+    title.textContent = "🏆 ¡Ganaste!";
+    title.classList.add("win");
+    document.querySelector("#playerA .crown").style.visibility = "visible";
+    document.getElementById("playerA").classList.add("winner");
+  } else if (r.winner_id && r.winner_id !== STATE.me.id) {
+    title.textContent = "💀 Perdiste";
+    title.classList.add("lose");
+    document.querySelector("#playerB .crown").style.visibility = "visible";
+    document.getElementById("playerB").classList.add("winner");
+  } else if (r.winner_id === null) {
+    title.textContent = "🤝 Empate";
+    title.classList.add("tie");
+  } else {
+    title.textContent = "⏱ Se acabó el tiempo";
+    title.classList.add("timeout");
+  }
+  const my = mePlayer ? mePlayer.found : 0;
+  const ot = other ? other.found : 0;
+  document.getElementById("finSub").textContent = `Descubriste ${my} items · Rival descubrió ${ot} items.`;
+}
+
+// ========== UTIL ==========
+function showScreen(name) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("screen-" + name).classList.add("active");
+}
+
+document.getElementById("cmdInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") runCmd();
+});
+</script>
+
 </body>
 </html>
