@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>API Lab — Modo 4 (próximamente)</title>
+<style>
+  body { margin: 0; padding: 0; background: #0a0e1a; color: #e6edf3;
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         line-height: 1.6; }
+  * { box-sizing: border-box; }
+  header { display: flex; justify-content: space-between; align-items: center;
+           padding: 20px 32px; border-bottom: 1px solid #2a3548; }
+  header h1 { margin: 0; font-size: 18px; color: #00ff9c; font-family: 'JetBrains Mono', monospace; }
+  header a { color: #8b96a8; text-decoration: none; font-size: 13px; border: 1px solid #2a3548;
+             padding: 6px 14px; border-radius: 100px; }
+  header a:hover { color: #00ff9c; border-color: #00ff9c; }
+  main { max-width: 640px; margin: 0 auto; padding: 60px 24px; text-align: center; }
+  .badge { display: inline-block; padding: 4px 14px; border: 1px solid #ffd83d; color: #ffd83d;
+           border-radius: 100px; font-size: 11px; font-family: 'JetBrains Mono', monospace;
+           font-weight: 700; letter-spacing: 1px; }
+  h2 { color: #ffd83d; font-size: 32px; margin: 24px 0 12px; }
+  p { color: #8b96a8; margin: 0 0 32px; font-size: 15px; }
+  .preview {
+    background: #111827; border: 1px solid #2a3548; border-radius: 12px;
+    padding: 28px; margin: 32px 0; text-align: left;
+  }
+  .preview h3 { color: #00ff9c; margin: 0 0 14px; font-size: 16px; }
+  .preview ol { margin: 0; padding-left: 22px; color: #c9d1d9; font-size: 14px; }
+  .preview li { margin: 8px 0; }
+  .preview code { color: #ffd83d; background: #0a0e1a; padding: 2px 8px; border-radius: 4px;
+                  font-size: 13px; }
+  a.back { display: inline-block; margin-top: 24px; color: #00d4ff; text-decoration: none;
+           border: 1px solid #00d4ff; padding: 10px 22px; border-radius: 6px;
+           font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+  a.back:hover { background: #00d4ff; color: #0a0e1a; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ API Lab</h1>
+  <a href="/">← Inicio</a>
+</header>
+<main>
+  <span class="badge">MODO 4 · 1 VS 1 (MULTIJUGADOR)</span>
+  <h2>⚔️ Próximamente</h2>
+  <p>Dos amigos en LAN, cada uno carga una DB con tema fijo (música / pelis / series / personajes / bandas), las DBs se rotan, y empiezan las consultas contrarreloj. El que descubre más items gana.</p>
+
+  <div class="preview">
+    <h3>Cómo va a funcionar:</h3>
+    <ol>
+      <li>Los 2 se conectan a <code>http://IP-DEL-SERVER:5050/modo4</code></li>
+      <li>Uno crea la sala (código de 4 chars), el otro se une</li>
+      <li>Cada uno tipea su nombre</li>
+      <li>Eligen tema fijo (música, pelis, series, personajes, bandas)</li>
+      <li>La PC rellena 15 items random — apretan <code>✓ LISTO</code></li>
+      <li>Cuando los 2 están listos: las DBs se rotan (cross-over)</li>
+      <li>Botón <code>▶ COMENZAR</code> → contador regresivo de <strong>1 hora</strong></li>
+      <li>Mientras corre: cada uno consulta la DB del rival</li>
+      <li>Cada item descubierto se tacha en la grilla al lado</li>
+      <li>Si se llena la grilla: <code>¡GANASTE!</code> (o empate)</li>
+      <li>Si llega a 1 hora: <code>ABANDONAR</code> automático</li>
+    </ol>
+  </div>
+
+  <a href="/" class="back">← Volver al menú</a>
+</main>
+</body>
+</html>

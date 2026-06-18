@@ -99,6 +99,8 @@
   .action.cyan:hover    { box-shadow: 0 8px 30px rgba(0,212,255,0.25); }
   .action.magenta { border-color: var(--magenta); }
   .action.magenta:hover { box-shadow: 0 8px 30px rgba(255,62,200,0.25); }
+  .action.yellow  { border-color: #ffd83d; }
+  .action.yellow:hover  { box-shadow: 0 8px 30px rgba(255,216,61,0.25); }
   .action .icon { font-size: 40px; display: block; margin-bottom: 8px; }
   .action .label { font-size: 18px; font-weight: 600; display: block; margin-bottom: 4px; }
   .action .desc { font-size: 12px; color: var(--muted); }
@@ -162,24 +164,30 @@
   </div>
 
   <div class="actions">
-    <a href="/cargar" class="action green">
+    <a href="/modo1" class="action green">
+      <span class="icon">📋</span>
+      <span class="label">Modo 1 — DB pre-cargada</span>
+      <span class="desc">Arrancás con datos ya cargados, solo consultás (--autoload)</span>
+    </a>
+    <a href="/cargar" class="action cyan">
       <span class="icon">📦</span>
-      <span class="label">Cargar datos</span>
-      <span class="desc">Elegí un dataset y cargalo en la DB</span>
+      <span class="label">Modo 2 — Manual</span>
+      <span class="desc">DB vacía, vos elegís qué cargar y borrar</span>
     </a>
-    <a href="/consola" class="action cyan">
-      <span class="icon">🔍</span>
-      <span class="label">Consola</span>
-      <span class="desc">Ejecutá comandos HTTP a mano</span>
+    <a href="/modo3" class="action magenta">
+      <span class="icon">🎲</span>
+      <span class="label">Modo 3 — Juego random</span>
+      <span class="desc">Elegís temas, la PC arma la DB, vos descubrís qué hay</span>
     </a>
-    <a href="/manual" class="action magenta">
-      <span class="icon">📖</span>
-      <span class="label">Ayuda</span>
-      <span class="desc">Manual paso a paso + catálogo completo</span>
+    <a href="/modo4" class="action yellow">
+      <span class="icon">⚔️</span>
+      <span class="label">Modo 4 — 1 vs 1</span>
+      <span class="desc">Multijugador LAN: dos amigos, 15 items random, contrarreloj 1h</span>
     </a>
   </div>
 
   <div class="links">
+    <a href="/consola">consola</a>
     <a href="/api/v1/discovery">discovery</a>
     <a href="/api/v1/fingerprint">fingerprint</a>
     <a href="/api/v1/routes">routes</a>
@@ -187,6 +195,7 @@
     <a href="/api/v1/help.txt">help (txt)</a>
     <a href="/api/v1/clientes">clientes</a>
     <a href="/standalone">option1 (standalone)</a>
+    <a href="/manual">manual</a>
   </div>
 </main>
 

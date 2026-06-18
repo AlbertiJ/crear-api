@@ -239,6 +239,21 @@ def cargar_page():
     """Página para cargar datasets con botones (POST visual)."""
     return send_from_directory(BASE_DIR, "cargar.html")
 
+@app.route("/modo1")
+def modo1_page():
+    """Modo 1: DB pre-cargada al arrancar (necesita --autoload al iniciar)."""
+    return send_from_directory(BASE_DIR, "modo1.html")
+
+@app.route("/modo3")
+def modo3_page():
+    """Modo 3: juego random por tema (single-player). Placeholder por ahora."""
+    return send_from_directory(BASE_DIR, "modo3.html")
+
+@app.route("/modo4")
+def modo4_page():
+    """Modo 4: 1 vs 1 (multijugador). Placeholder por ahora."""
+    return send_from_directory(BASE_DIR, "modo4.html")
+
 @app.route("/standalone")
 @app.route("/option1")
 def standalone_page():
@@ -855,24 +870,51 @@ def search_clientes():
 def static_files(filename):
     return send_from_directory(BASE_DIR, filename)
 
+def _do_load(name):
+    """Carga un dataset a la DB sin pasar por HTTP. Usado por --autoload y endpoints."""
+    if name not in DATASETS or DATASETS[name] is None:
+        return False, f"Dataset '{name}' no existe"
+    if name in DB["loaded"]:
+        return True, f"ya estaba cargado"
+    payload = json.loads(json.dumps(DATASETS[name]))
+    payload["loaded_at"] = utc_now_iso()
+    DB["loaded"][name] = payload
+    DB["history"].append({"action": "load", "dataset": name, "ts": payload["loaded_at"], "source": "autoload"})
+    return True, f"cargado ({count_commands(payload)} comandos)"
+
+
 # ---------------------------------------------------------------------
 # MAIN
 # ---------------------------------------------------------------------
 if __name__ == "__main__":
     port = 5050
     host = "127.0.0.1"
+    autoload = []
     if "--host" in sys.argv:
         i = sys.argv.index("--host")
         host = sys.argv[i + 1] if i + 1 < len(sys.argv) else "0.0.0.0"
     if "--port" in sys.argv:
         i = sys.argv.index("--port")
         port = int(sys.argv[i + 1])
+    if "--autoload" in sys.argv:
+        i = sys.argv.index("--autoload")
+        autoload = [s.strip() for s in sys.argv[i + 1].split(",") if s.strip()] if i + 1 < len(sys.argv) else []
+
+    # autoload: cargar datasets ANTES de levantar el server
+    if autoload:
+        print(f"⚙  --autoload: {autoload}")
+        for name in autoload:
+            ok, msg = _do_load(name)
+            mark = "✓" if ok else "✗"
+            print(f"   {mark} {name}: {msg}")
+
     print(f"""
 ╔════════════════════════════════════════════════════════════╗
 ║           API LAB — Pentesting & Linux                     ║
 ║                                                            ║
 ║   Servidor:  http://{host}:{port}                           ║
 ║   Datos:     {len([v for v in DATASETS.values() if v])} datasets disponibles                ║
+║   DB ahora:  {len(DB["loaded"])} cargados · {sum(count_commands(d) for d in DB["loaded"].values())} comandos                                ║
 ║                                                            ║
 ║   Endpoints clave:                                         ║
 ║     GET  /api/v1/help                                       ║
@@ -880,6 +922,14 @@ if __name__ == "__main__":
 ║     POST /api/v1/datasets/privesc/load                      ║
 ║     GET  /api/v1/commands?cat=suid&severity=critical        ║
 ║     GET  /api/v1/shells                                     ║
+║                                                            ║
+║   Modos:                                                   ║
+║     /         → home con selector de modo                  ║
+║     /modo1    → DB pre-cargada (necesita --autoload)       ║
+║     /consola  → modo 2: manual                             ║
+║     /cargar   → botones CARGAR / VACIAR                    ║
+║     /modo3    → juego random por tema (próximamente)       ║
+║     /modo4    → 1 vs 1 (próximamente)                      ║
 ║                                                            ║
 ║   Ctrl+C para detener.                                     ║
 ╚════════════════════════════════════════════════════════════╝
