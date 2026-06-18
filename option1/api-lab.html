@@ -146,11 +146,15 @@
     background: var(--accent); margin-right: 8px;
   }
   .console-output {
-    flex: 1;
+    flex: 1 1 0;
+    min-height: 120px;
+    max-height: 50vh;
     padding: 12px 16px;
     overflow-y: auto;
     font-size: 13px;
     line-height: 1.6;
+    word-break: break-word;
+    overflow-wrap: anywhere;
   }
   .console-line { margin-bottom: 4px; }
   .console-line.req { color: var(--info); }
@@ -200,7 +204,9 @@
 
   /* CONTENT */
   .content {
-    height: 320px;
+    flex: 1 1 auto;
+    min-height: 240px;
+    max-height: 50vh;
     overflow-y: auto;
     padding: 16px 24px;
     background: var(--bg);
@@ -322,6 +328,19 @@
   ::-webkit-scrollbar-track { background: var(--bg-elev); }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+  /* RESPONSIVE — en pantallas chicas, sidebar pasa arriba */
+  @media (max-width: 900px) {
+    .app {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr;
+      height: auto;
+      min-height: calc(100vh - 60px);
+    }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); max-height: 200px; }
+    .content { max-height: none; }
+    .console-output { max-height: none; }
+  }
 </style>
 </head>
 <body>

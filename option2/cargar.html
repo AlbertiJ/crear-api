@@ -46,6 +46,22 @@
   .ds button:disabled { opacity: 0.4; cursor: not-allowed; }
   .ds .result { margin-top: 10px; font-size: 12px; color: #00ff9c; font-family: 'JetBrains Mono', monospace; word-break: break-all; }
   .ds .result.err { color: #ff4d6d; }
+  .ds .actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .ds .actions button.unload { border-color: #ff4d6d; color: #ff4d6d; }
+  .ds .actions button.unload:hover { background: #ff4d6d; color: #0a0e1a; }
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 24px; padding: 14px 18px; background: #111827;
+    border: 1px solid #2a3548; border-radius: 10px;
+  }
+  .topbar .label { color: #8b96a8; font-size: 13px; font-family: 'JetBrains Mono', monospace; }
+  .topbar button.flush {
+    background: transparent; border: 2px solid #ff4d6d; color: #ff4d6d;
+    padding: 8px 18px; border-radius: 6px; font-weight: 600; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    transition: all 0.2s;
+  }
+  .topbar button.flush:hover { background: #ff4d6d; color: #0a0e1a; }
   nav.crumbs { color: #8b96a8; font-size: 12px; margin-bottom: 16px; }
   nav.crumbs a { color: #00ff9c; text-decoration: none; }
 </style>
@@ -60,32 +76,46 @@
 <main>
   <nav class="crumbs"><a href="/">Inicio</a> &gt; Cargar datos</nav>
   <h2>📦 Cargar datos</h2>
-  <p class="sub">La DB arranca vacía. Elegí un dataset y cargalo con un click.</p>
+  <p class="sub">La DB arranca vacía. Elegí un dataset y cargalo con un click. Para limpiar, usá VACIAR (por dataset) o VACIAR TODO.</p>
+
+  <div class="topbar">
+    <span class="label">DB: <strong id="topbarDB" style="color:#00ff9c">—</strong> cargados · <strong id="topbarCmds" style="color:#00ff9c">—</strong> comandos</span>
+    <button class="flush" onclick="flushAll(this)">🗑 VACIAR TODO</button>
+  </div>
 
   <div class="datasets" id="datasets">
-    <div class="ds">
+    <div class="ds" data-ds="privesc">
       <div class="info">
         <div class="name">privesc</div>
         <div class="desc">Técnicas de escalada de privilegios en Linux</div>
         <div class="meta" id="meta-privesc">cargando…</div>
       </div>
-      <button onclick="loadDs('privesc', this)">CARGAR</button>
+      <div class="actions">
+        <button class="load"   onclick="loadDs('privesc', this)">CARGAR</button>
+        <button class="unload" onclick="unloadDs('privesc', this)">VACIAR</button>
+      </div>
     </div>
-    <div class="ds">
+    <div class="ds" data-ds="commands">
       <div class="info">
         <div class="name">commands</div>
         <div class="desc">Comandos esenciales de Linux para uso diario</div>
         <div class="meta" id="meta-commands">cargando…</div>
       </div>
-      <button onclick="loadDs('commands', this)">CARGAR</button>
+      <div class="actions">
+        <button class="load"   onclick="loadDs('commands', this)">CARGAR</button>
+        <button class="unload" onclick="unloadDs('commands', this)">VACIAR</button>
+      </div>
     </div>
-    <div class="ds">
+    <div class="ds" data-ds="clientes">
       <div class="info">
         <div class="name">clientes</div>
         <div class="desc">DB de prueba con campos de cliente (DNI, CUIT, domicilio, etc.)</div>
         <div class="meta" id="meta-clientes">cargando…</div>
       </div>
-      <button onclick="loadDs('clientes', this)">CARGAR</button>
+      <div class="actions">
+        <button class="load"   onclick="loadDs('clientes', this)">CARGAR</button>
+        <button class="unload" onclick="unloadDs('clientes', this)">VACIAR</button>
+      </div>
     </div>
   </div>
 </main>
@@ -95,10 +125,15 @@ const RESULT_KEY = "Resultado: ";
 
 async function loadDs(name, btn) {
   btn.disabled = true;
+  const origText = btn.textContent;
   btn.textContent = "CARGANDO…";
-  const resultEl = btn.parentElement.querySelector(".result") || (() => {
-    const d = document.createElement("div"); d.className = "result"; btn.parentElement.appendChild(d); return d;
-  })();
+  const card = btn.closest(".ds");
+  let resultEl = card.querySelector(".result");
+  if (!resultEl) {
+    resultEl = document.createElement("div");
+    resultEl.className = "result";
+    card.querySelector(".info").appendChild(resultEl);
+  }
   resultEl.textContent = "";
   resultEl.classList.remove("err");
   try {
@@ -122,6 +157,77 @@ async function loadDs(name, btn) {
   refreshMeta();
 }
 
+async function unloadDs(name, btn) {
+  btn.disabled = true;
+  const origText = btn.textContent;
+  btn.textContent = "VACIANDO…";
+  const card = btn.closest(".ds");
+  let resultEl = card.querySelector(".result");
+  if (!resultEl) {
+    resultEl = document.createElement("div");
+    resultEl.className = "result";
+    card.querySelector(".info").appendChild(resultEl);
+  }
+  resultEl.textContent = "";
+  resultEl.classList.remove("err");
+  try {
+    const r = await fetch("/api/v1/datasets/" + name, { method: "DELETE" });
+    const data = await r.json();
+    if (r.ok) {
+      resultEl.textContent = "✓ " + (data.msg || "vaciado");
+      // resetear el botón CARGAR también
+      const loadBtn = card.querySelector("button.load");
+      if (loadBtn) { loadBtn.textContent = "CARGAR"; loadBtn.disabled = false; }
+      btn.textContent = "VACIADO";
+    } else {
+      resultEl.textContent = "✗ " + (data.error || ("HTTP " + r.status));
+      resultEl.classList.add("err");
+      btn.disabled = false;
+      btn.textContent = "REINTENTAR";
+    }
+  } catch (e) {
+    resultEl.textContent = "✗ " + e.message;
+    resultEl.classList.add("err");
+    btn.disabled = false;
+    btn.textContent = "REINTENTAR";
+  }
+  refreshMeta();
+}
+
+async function flushAll(btn) {
+  if (!confirm("¿Vaciar TODA la DB? Esto borra todos los datasets cargados.")) return;
+  btn.disabled = true;
+  const origText = btn.textContent;
+  btn.textContent = "VACIANDO…";
+  try {
+    const r = await fetch("/api/v1/db", { method: "DELETE" });
+    const data = await r.json();
+    if (r.ok) {
+      btn.textContent = "✓ VACIADO";
+      // limpiar todos los results
+      document.querySelectorAll(".ds .result").forEach(el => {
+        el.textContent = "";
+        el.classList.remove("err");
+      });
+      // resetear todos los botones
+      document.querySelectorAll(".ds").forEach(card => {
+        const lb = card.querySelector("button.load");
+        const ub = card.querySelector("button.unload");
+        if (lb) { lb.textContent = "CARGAR"; lb.disabled = false; }
+        if (ub) { ub.textContent = "VACIAR"; ub.disabled = false; }
+      });
+      setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 1500);
+    } else {
+      btn.textContent = "✗ ERROR";
+      btn.disabled = false;
+    }
+  } catch (e) {
+    btn.textContent = "✗ " + e.message;
+    btn.disabled = false;
+  }
+  refreshMeta();
+}
+
 async function refreshMeta() {
   try {
     const r = await fetch("/api/v1/datasets");
@@ -135,6 +241,13 @@ async function refreshMeta() {
         : (d.available.includes(name) ? "disponible" : "no existe");
       el.style.color = isLoaded ? "#00ff9c" : "#4d9fff";
     });
+  } catch (e) { /* ignore */ }
+  // topbar
+  try {
+    const r = await fetch("/api/v1/db");
+    const d = await r.json();
+    document.getElementById("topbarDB").textContent = (d.loaded_datasets || []).length;
+    document.getElementById("topbarCmds").textContent = d.total_commands || 0;
   } catch (e) { /* ignore */ }
 }
 refreshMeta();
