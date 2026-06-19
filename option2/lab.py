@@ -1208,12 +1208,14 @@ def create_room():
     name = (body.get("name") or "Anónimo").strip()[:20]
     if not name:
         return jsonify({"error": "Falta 'name'"}), 400
-    # rate limit por IP
-    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown").split(",")[0].strip()
-    if not _rate_limit_ok(ip):
-        return jsonify({
-            "error": f"Rate limit: máximo {ROOM_CREATE_MAX} salas por IP cada {ROOM_CREATE_WINDOW}s. Esperá un momento.",
-        }), 429
+    # rate limit por IP — solo en modo público (LAN). En loopback el dueño
+    # puede crear/abandonar tranquilo sin que el rate limit lo frene.
+    if PUBLIC_MODE:
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown").split(",")[0].strip()
+        if not _rate_limit_ok(ip):
+            return jsonify({
+                "error": f"Rate limit: máximo {ROOM_CREATE_MAX} salas por IP cada {ROOM_CREATE_WINDOW}s. Esperá un momento.",
+            }), 429
     # generar código único
     for _ in range(20):
         code = _gen_room_code()
@@ -1866,27 +1868,39 @@ if __name__ == "__main__":
    Para jugar en LAN, los 2 deben estar en la misma red privada.
 """)
 
-    print(f"""
-╔════════════════════════════════════════════════════════════╗
-║           API LAB — Pentesting & Linux                     ║
-║                                                            ║
-║   Servidor:  http://{host}:{port}                           ║
-║   Datos:     {len([v for v in DATASETS.values() if v])} datasets disponibles                ║
-║   DB ahora:  {len(DB["loaded"])} cargados · {sum(count_commands(d) for d in DB["loaded"].values())} comandos                                ║
-║   Modo:      {'loopback (1 sólo máquina)' if is_loopback else 'LAN (whitelist IPs privadas ON)'}              ║
-║                                                            ║
-║   Páginas:                                                  ║
-║     /         → home con selector de 4 modos                ║
-║     /modo1    → DB pre-cargada (necesita --autoload)       ║
-║     /consola  → modo 2: manual                             ║
-║     /cargar   → botones CARGAR / VACIAR                    ║
-║     /modo3    → juego random (single-player)               ║
-║     /modo4    → 1 vs 1 (multijugador LAN)                  ║
-║     /manual   → manual paso a paso                         ║
-║                                                            ║
-║   Ctrl+C para detener.                                     ║
-╚════════════════════════════════════════════════════════════╝
-""")
+    # Banner autoalineado (no se rompe con valores de longitudes variables)
+    W = 60  # ancho interno del banner
+    def row(content):
+        # content SIN los ║. Devuelve "║ ... ║" con padding correcto
+        # Asegurarse de que content entre en W chars
+        c = content[:W]
+        return f"║ {c.ljust(W - 1)}║"
+    b = []
+    b.append("╔" + "═" * (W + 1) + "╗")
+    b.append(row("⚡ API LAB — Pentesting & Linux  (v1.2.0)"))
+    b.append(row(""))
+    b.append(row(f"Servidor:   http://{host}:{port}"))
+    n_ds = len([v for v in DATASETS.values() if v])
+    n_loaded = len(DB["loaded"])
+    n_cmds = sum(count_commands(d) for d in DB["loaded"].values())
+    b.append(row(f"Datos:      {n_ds} datasets disponibles"))
+    b.append(row(f"DB ahora:   {n_loaded} cargados · {n_cmds} comandos"))
+    b.append(row(f"Modo:       {'loopback (1 sola maquina)' if is_loopback else 'LAN (whitelist IPs privadas ON)'}"))
+    b.append(row(""))
+    b.append(row("Paginas:"))
+    b.append(row("  /         -> home con selector de 4 modos"))
+    b.append(row("  /modo1    -> DB pre-cargada (necesita --autoload)"))
+    b.append(row("  /consola  -> modo 2: manual"))
+    b.append(row("  /cargar   -> botones CARGAR / VACIAR"))
+    b.append(row("  /modo3    -> juego random (single-player)"))
+    b.append(row("  /modo4    -> 1 vs 1 (multijugador LAN)"))
+    b.append(row("  /manual   -> manual paso a paso"))
+    b.append(row(""))
+    b.append(row("Ctrl+C para detener."))
+    b.append("╚" + "═" * (W + 1) + "╝")
+    print()
+    print("\n".join(b))
+
     # Usar waitress (production WSGI server) en lugar de Flask dev server.
     # Waitress es lo que recomienda Flask/Python para exponer el server
     # a una red. Si no está instalado, fallback a werkzeug.serving
