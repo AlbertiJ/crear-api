@@ -211,6 +211,9 @@
     padding: 16px 24px;
     background: var(--bg);
   }
+  /* MODO CONSOLA: ocultar .content, expandir .console a todo el alto */
+  .main.console-mode .content { display: none; }
+  .main.console-mode .console { flex: 1 1 0; min-height: 0; }
   .content h2 {
     font-size: 14px;
     color: var(--accent);
@@ -1139,9 +1142,12 @@ function renderView(view) {
    ============================================================ */
 window.runQuick = (cmd) => {
   executeCommand(cmd);
+  // cambiar a modo consola (esconder vista)
   $$(".tab").forEach(t => t.classList.remove("active"));
   $$(".tab[data-tab=console]").forEach(t => t.classList.add("active"));
-  $(".console").scrollIntoView({ behavior: "smooth", block: "end" });
+  const main = $(".main");
+  if (main) main.classList.add("console-mode");
+  $("#cmd").focus();
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -1154,19 +1160,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // tabs
+  // tabs — togglean entre modo Vista (panel + consola) y modo Consola (solo consola)
   $$(".tab").forEach(tab => {
     tab.addEventListener("click", () => {
       $$(".tab").forEach(t => t.classList.remove("active"));
       tab.classList.add("active");
-      // cada tab hace algo concreto:
+      const main = $(".main");
       if (tab.dataset.tab === "console") {
-        // Consola API: scroll a la consola y focus al input
-        const consoleEl = $(".console");
-        if (consoleEl) consoleEl.scrollIntoView({ behavior: "smooth", block: "end" });
-        setTimeout(() => $("#cmd").focus(), 200);
+        // Modo consola: ocultar .content, expandir .console a todo el alto
+        if (main) main.classList.add("console-mode");
+        setTimeout(() => $("#cmd").focus(), 150);
       } else if (tab.dataset.tab === "content") {
-        // Vista: scroll al panel de contenido
+        // Modo vista: mostrar .content otra vez
+        if (main) main.classList.remove("console-mode");
         const viewEl = $("#view");
         if (viewEl) viewEl.scrollIntoView({ behavior: "smooth", block: "start" });
       }
