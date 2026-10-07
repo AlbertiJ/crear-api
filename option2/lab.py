@@ -1839,7 +1839,10 @@ if __name__ == "__main__":
     autoload = []
     if "--host" in sys.argv:
         i = sys.argv.index("--host")
-        host = sys.argv[i + 1] if i + 1 < len(sys.argv) else "0.0.0.0"
+        if i + 1 < len(sys.argv) and not sys.argv[i + 1].startswith("--"):
+            host = sys.argv[i + 1]
+        else:  # --host sin valor: no exponer por accidente; hay que pasar la IP a proposito
+            print("--host necesita un valor (ej: --host 0.0.0.0 para LAN). Se usa 127.0.0.1.")
     if "--port" in sys.argv:
         i = sys.argv.index("--port")
         port = int(sys.argv[i + 1])
